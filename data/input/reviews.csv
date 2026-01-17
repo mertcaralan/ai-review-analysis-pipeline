@@ -1,0 +1,11 @@
+review_id,source,app_id,author_name,review_text,rating,thumbs_up,review_timestamp,last_update_timestamp,app_version,device,os_version,language,country,developer_response,response_timestamp
+gp_0001,google_play,tr.com.apps.fashion.battle,"Ali K.","Game crashes when I open the shop. Please fix ASAP.",1,12,2026-01-10T18:22:11Z,2026-01-10T18:22:11Z,2.4.1,"Samsung Galaxy A52","Android 13","en","TR","", 
+gp_0002,google_play,tr.com.apps.fashion.battle,"Zeynep G.","After the update, ads are too frequent. It ruins the experience.",2,8,2026-01-11T09:05:44Z,2026-01-11T09:05:44Z,2.4.1,"iPhone 12","iOS 17","en","TR","", 
+gp_0003,google_play,tr.com.apps.fashion.battle,"Mert C.","Love the visuals and outfits! Great job.",5,21,2026-01-11T13:40:01Z,2026-01-11T13:40:01Z,2.4.1,"Xiaomi Redmi Note 10","Android 12","en","TR","", 
+gp_0004,google_play,tr.com.apps.fashion.battle,"Ayşe T.","Please add more levels. I finished everything in 2 days.",4,5,2026-01-12T07:12:33Z,2026-01-12T07:12:33Z,2.4.1,"Samsung Galaxy S21","Android 13","en","TR","", 
+gp_0005,google_play,tr.com.apps.fashion.battle,"Can B.","Payment failed but money was taken. Need refund!",1,30,2026-01-12T22:18:50Z,2026-01-12T22:18:50Z,2.4.1,"Huawei P30","Android 11","en","TR","We are investigating this issue. Please contact support.","2026-01-13T08:10:00Z"
+gp_0006,google_play,tr.com.apps.fashion.battle,"Elif S.","It keeps freezing on level 3. Freezes every time.",2,14,2026-01-13T10:01:15Z,2026-01-13T10:01:15Z,2.4.1,"Samsung Galaxy A52","Android 13","en","TR","", 
+gp_0007,google_play,tr.com.apps.fashion.battle,"Ali K.","Game crashes when I open the shop. Please fix ASAP.",1,12,2026-01-10T18:22:11Z,2026-01-10T18:22:11Z,2.4.1,"Samsung Galaxy A52","Android 13","en","TR","", 
+gp_0008,app_store,tr.com.apps.fashion.battle,"Deniz P.","Why does the game require internet all the time?",3,3,2026-01-13T19:44:02Z,2026-01-13T19:44:02Z,2.4.1,"iPhone 14","iOS 17","en","US","", 
+gp_0009,app_store,tr.com.apps.fashion.battle,"Eren Y.","Good game but loading is slow sometimes.",4,2,2026-01-14T08:30:27Z,2026-01-14T08:30:27Z,2.4.2,"iPhone 13","iOS 17","en","US","", 
+gp_0010,google_play,tr.com.apps.fashion.battle,"Seda N.","Please bring back the old daily rewards system.",3,6,2026-01-14T15:09:10Z,2026-01-14T15:09:10Z,2.4.2,"Samsung Galaxy S20","Android 12","en","TR","", 
