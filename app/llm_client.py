@@ -1,3 +1,8 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 import json
 from openai import OpenAI
 from app.prompts import ANALYZE_REVIEW_PROMPT
