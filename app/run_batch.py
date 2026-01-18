@@ -11,10 +11,3 @@ def run_llm_batch(payload_df: pd.DataFrame) -> pd.DataFrame:
         results.append(analysis.model_dump())
 
     return pd.DataFrame(results)
-
-
-if __name__ == "__main__":
-    payload_df = pd.read_csv("data/interim/review_payloads.csv")
-    results_df = run_llm_batch(payload_df)
-    results_df.to_csv("data/output/results.csv", index=False)
-    print(f"Analyzed {len(results_df)} reviews")
