@@ -1,10 +1,43 @@
 review_id,category,urgency,summary,tags,rating,thumbs_up,priority_score
-gp_0001,bug,high,The game crashes when accessing the shop.,"['crash', 'shop', 'bug', 'game', 'fix']",1,12,152
-gp_0002,ads,medium,Frequent ads after the update negatively impact the user experience.,"['ads', 'user_experience', 'update', 'feedback', 'complaint']",2,8,88
-gp_0003,praise,low,User appreciates the visuals and outfits in the app.,"['visuals', 'outfits', 'design', 'user_experience', 'positive_feedback']",5,21,31
-gp_0004,feature_request,low,User requests additional levels due to completing the game quickly.,"['more_levels', 'gameplay', 'content', 'suggestion', 'user_feedback']",4,5,25
-gp_0005,payment,high,User experienced a payment failure despite money being deducted.,"['refund', 'payment_failure', 'user_experience']",1,30,170
-gp_0006,bug,high,The app freezes consistently on level 3.,"['freezing', 'level_3', 'crash', 'user_experience', 'performance_issue']",2,14,144
-gp_0008,complaint,low,The game requires constant internet access.,"['internet_requirement', 'gameplay', 'connectivity']",3,3,33
-gp_0009,performance,low,The game has slow loading times occasionally.,"['loading', 'gameplay', 'performance', 'user_experience']",4,2,22
-gp_0010,feature_request,low,User requests the return of the old daily rewards system.,"['daily_rewards', 'user_feedback', 'feature_request']",3,6,36
+gp_0001,bug,high,The game crashes when opening the shop.,"['crash', 'shop', 'bug', 'game', 'fix']",1.0,12.0,152.0
+gp_0002,ads,medium,Frequent ads after the update negatively impact the user experience.,"['ads', 'user_experience', 'update', 'annoyance']",2.0,8.0,88.0
+gp_0003,praise,low,User appreciates the visuals and outfits in the app.,"['visuals', 'outfits', 'design', 'user_experience', 'positive_feedback']",5.0,21.0,31.0
+gp_0004,feature_request,low,User requests additional levels due to completing the game quickly.,"['more_levels', 'gameplay', 'content', 'user_feedback', 'suggestion']",4.0,5.0,25.0
+gp_0005,payment,high,User experienced a payment failure despite being charged.,"['refund', 'payment_failure', 'user_experience']",1.0,30.0,170.0
+gp_0006,bug,high,The app freezes consistently on level 3.,"['freezing', 'level_3', 'gameplay', 'crash', 'bug']",2.0,14.0,144.0
+as_0008,complaint,low,"The game requires constant internet access, which is frustrating.","['internet_requirement', 'gameplay', 'user_experience']",3.0,3.0,33.0
+as_0009,performance,low,The game is enjoyable but experiences slow loading times occasionally.,"['loading', 'gameplay', 'performance', 'user_experience']",4.0,2.0,22.0
+gp_0010,feature_request,low,User requests the return of the old daily rewards system.,"['daily_rewards', 'user_feedback', 'feature_improvement']",3.0,6.0,36.0
+gp_0011,bug,high,The tutorial is unresponsive due to a non-functional 'Next' button.,"['tutorial', 'button', 'usability', 'error', 'user_experience']",1.0,18.0,158.0
+gp_0012,performance,medium,The game drains battery too fast.,"['battery_drain', 'game_performance', 'user_experience']",2.0,9.0,89.0
+gp_0013,ads,medium,The app has a great concept but is hindered by excessive popups.,"['popups', 'user_experience', 'concept']",3.0,4.0,74.0
+as_0014,bug,medium,User is unable to restore purchases after reinstalling the app.,"['restore_purchases', 'reinstall', 'user_experience']",1.0,11.0,101.0
+as_0015,bug,high,The app is unusable after the last update due to a black screen.,"['app_crash', 'black_screen', 'update_issue']",1.0,22.0,162.0
+gp_0016,complaint,low,User finds the outfits nice but feels the matchmaking is unfair.,"['matchmaking', 'outfits', 'fairness']",3.0,7.0,37.0
+gp_0017,bug,high,"Login fails with Google, causing a looping issue.","['login', 'google', 'looping', 'error', 'bug']",1.0,16.0,156.0
+as_0018,ads,medium,The app has excessive ads after every round.,"['excessive_ads', 'user_experience', 'annoyance']",2.0,5.0,85.0
+gp_0019,feature_request,low,User requests the addition of Turkish language support.,"['language_support', 'feature_request', 'user_feedback']",4.0,3.0,23.0
+as_0021,performance,medium,The game experiences significant lag when opening the wardrobe.,"['lag', 'wardrobe', 'performance_issue', 'slow', 'user_experience']",2.0,8.0,88.0
+gp_0022,complaint,medium,The new UI is confusing and makes it hard to find events.,"['ui', 'confusion', 'navigation', 'events', 'user_experience']",2.0,2.0,82.0
+gp_0023,bug,medium,The sound functionality is disrupted after ads play.,"['sound_issue', 'ads', 'random_cutouts']",3.0,1.0,71.0
+as_0024,feature_request,low,User requests additional hairstyles and accessories.,"['hairstyles', 'accessories', 'customization']",4.0,4.0,24.0
+gp_0025,bug,high,The app crashes when displaying match results.,"['crash', 'match_results', 'bug_report']",1.0,10.0,150.0
+as_0027,performance,low,The game is enjoyable but causes my phone to warm up.,"['gameplay', 'phone_overheating', 'user_experience']",4.0,3.0,23.0
+gp_0028,payment,high,User did not receive diamonds after payment.,"['payment_failure', 'in_app_purchase', 'user_experience']",1.0,25.0,165.0
+as_0029,complaint,medium,The game repeatedly requests tracking permission.,"['tracking_permission', 'user_experience', 'annoyance']",2.0,6.0,86.0
+gp_0030,bug,medium,The daily missions feature is malfunctioning by resetting unexpectedly.,"['daily_missions', 'reset_issue', 'user_experience']",2.0,9.0,89.0
+gp_0031,bug,high,User unable to change username due to an error.,"['username_change', 'error_500', 'user_experience']",2.0,7.0,137.0
+as_0032,bug,medium,The app has no sound when using Bluetooth headphones.,"['bluetooth', 'sound', 'audio', 'headphones', 'bug']",3.0,2.0,72.0
+gp_0033,complaint,medium,The game is enjoyable but suffers from unfair matchmaking.,"['matchmaking', 'gameplay', 'fairness']",3.0,7.0,77.0
+as_0035,bug,high,The game freezes on startup and sometimes doesn't launch at all.,"['game_freeze', 'startup_issue', 'crash', 'usability', 'performance']",1.0,13.0,153.0
+gp_0036,ads,medium,Rewards are not granted after watching ads.,"['ads', 'rewards', 'user_experience']",2.0,19.0,99.0
+as_0037,praise,low,The update resolved crashing issues.,"['update', 'crashes', 'fix', 'thanks', 'positive_feedback']",5.0,4.0,14.0
+as_0039,bug,high,The app crashes when trying to open the shop.,"['app_crash', 'shop', 'bug_report', 'urgent', 'fix_needed']",1.0,12.0,152.0
+gp_0040,bug,medium,The game fails to load on Wi-Fi but works on mobile data.,"['game_loading', 'wifi_issue', 'mobile_data']",3.0,2.0,72.0
+as_0041,payment,high,User was charged twice for the same pack.,"['refund', 'billing_issue', 'duplicate_charge']",1.0,17.0,157.0
+gp_0042,bug,high,The game crashes when tapping on Events.,"['crash', 'events', 'gameplay', 'user_experience', 'technical_issue']",1.0,15.0,155.0
+as_0045,feature_request,low,User requests the addition of an offline mode.,"['offline_mode', 'feature_request', 'user_suggestion']",4.0,3.0,23.0
+gp_0046,performance,medium,The game occasionally freezes on the results screen.,"['game_freeze', 'results_screen', 'performance_issue']",2.0,6.0,86.0
+as_0047,ads,medium,"The close button for ads is sometimes missing, causing frustration.","['ads', 'close_button', 'user_experience']",2.0,9.0,89.0
+gp_0048,other,low,The review contains a non-descriptive text.,[],3.0,0.0,30.0
+gp_0049,performance,medium,The app experiences lag after the latest patch.,"['lag', 'patch', 'performance_issue']",2.0,8.0,88.0

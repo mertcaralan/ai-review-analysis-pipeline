@@ -18,8 +18,14 @@ def add_priority_score(
 
     # Merge rating and thumbs_up from payloads
     df = results_df.merge(
-        payload_df[["review_id", "rating", "thumbs_up"]], on="review_id", how="left"
+        payload_df[["review_id", "rating", "thumbs_up"]],
+        on="review_id",
+        how="left",
     )
+
+    # --- FIX: ensure numeric and handle missing values ---
+    df["rating"] = pd.to_numeric(df["rating"], errors="coerce").fillna(3)
+    df["thumbs_up"] = pd.to_numeric(df["thumbs_up"], errors="coerce").fillna(0)
 
     urgency_weights = {"high": 100, "medium": 50, "low": 10}
 
