@@ -10,11 +10,11 @@ Status: Phase 2 completed.
 
 This project takes raw app store reviews in CSV format and processes them through a structured pipeline:
 
-- Cleans and normalizes raw review data
-- Sends reviews to an LLM with a fixed output schema
-- Produces structured, machine-readable results
-- Adds priority scoring for issue triage
-- Generates tabular and visual outputs for fast inspection
+* Cleans and normalizes raw review data
+* Sends reviews to an LLM with a fixed output schema
+* Produces structured, machine-readable results
+* Adds priority scoring for issue triage
+* Generates tabular and visual outputs for fast inspection
 
 The pipeline is designed as a CLI-first data processing tool and can later be extended with automation or an API layer.
 
@@ -92,7 +92,10 @@ ai-review-analysis-pipeline/
 │     ├─ top_urgent.csv
 │     └─ charts/
 │        ├─ category_distribution.png
-│        └─ urgency_distribution.png
+│        ├─ urgency_distribution.png
+│        ├─ priority_weighted_category.png
+│        ├─ urgency_category_heatmap.png
+│        └─ top_urgent_table.png
 ├─ main.py
 ├─ requirements.txt
 ├─ .env.example
@@ -106,6 +109,7 @@ ai-review-analysis-pipeline/
 File: [data/input/reviews.csv](data/input/reviews.csv)
 
 Raw user reviews.
+The test dataset may include duplicate rows or missing values to validate pipeline robustness.
 
 Required columns:
 
@@ -113,6 +117,7 @@ Required columns:
 * `review_text`
 * `rating` (1–5)
 * `thumbs_up`
+* `source` (`google_play` / `app_store`)
 
 Example:
 
@@ -189,6 +194,13 @@ Where:
 * rating_penalty: (5 - rating) * 10
 * thumbs_bonus: min(thumbs_up, 50)
 
+### Robustness Notes
+
+To ensure the pipeline does not break on imperfect datasets, **defensive defaults** are applied:
+
+* If `rating` is missing or non-numeric → default **3**
+* If `thumbs_up` is missing or invalid → default **0**
+
 ---
 
 ## Visual Outputs
@@ -196,10 +208,6 @@ Where:
 Charts are generated automatically under `data/output/charts/`.
 
 ### Category Distribution
-
-```
-data/output/charts/category_distribution.png
-```
 
 Shows how reviews are distributed across issue categories.
 
@@ -209,13 +217,44 @@ Shows how reviews are distributed across issue categories.
 
 ### Urgency Distribution
 
-```
-data/output/charts/urgency_distribution.png
-```
-
 Shows urgency levels across all analyzed reviews.
 
 ![Urgency Distribution](data/output/charts/urgency_distribution.png)
+
+---
+
+### Priority-Weighted Category Impact
+
+Highlights categories with the highest cumulative impact based on priority scoring.
+
+![Priority Weighted Category](data/output/charts/priority_weighted_category.png)
+
+---
+
+### Urgency × Category Heatmap
+
+Helps identify where high-urgency issues are concentrated.
+
+![Urgency Category Heatmap](data/output/charts/urgency_category_heatmap.png)
+
+---
+
+### Top 10 Urgent Issues (Shareable Table)
+
+Slack-ready visual table for quick escalation.
+
+![Top Urgent Table](data/output/charts/top_urgent_table.png)
+
+---
+
+## Dependencies
+
+### Visualization Dependencies
+
+The visualization layer introduces the following dependencies:
+
+* `matplotlib`
+* `seaborn`
 
 ---
 
@@ -225,6 +264,35 @@ Shows urgency levels across all analyzed reviews.
 * All outputs are validated before being written.
 * The pipeline continues gracefully if a single review fails.
 * Designed for reproducibility and auditability.
+
+---
+
+## Example Pipeline Run (CLI Output)
+
+Below is a sample terminal output from a successful end-to-end run:
+
+```text
+[1/3] Loading reviews...
+Reviews cleaned: 50 → 42
+42 reviews loaded
+
+[2/3] Building payloads...
+42 payloads ready
+
+[3/3] Running AI analysis...
+Analyzing: 100%|████████████████████████| 42/42 [01:24<00:00,  2.00s/it]
+
+[Phase 2] Adding priority scores...
+Results saved: data/output/results.csv
+Top 10 urgent saved: data/output/top_urgent.csv
+Charts saved: data/output/charts/
+
+Summary:
+Categories: {'bug': 15, 'performance': 6, 'feature_request': 5, 'ads': 5, 'complaint': 5, 'payment': 3, 'praise': 2, 'other': 1}
+Urgency: {'medium': 17, 'high': 13, 'low': 12}
+```
+
+This output demonstrates that the pipeline runs end-to-end and produces all expected artifacts.
 
 ---
 
@@ -248,4 +316,3 @@ Shows urgency levels across all analyzed reviews.
 
 GitHub: [https://github.com/mertcaralan](https://github.com/mertcaralan)
 LinkedIn: [https://www.linkedin.com/in/mertcaralan/](https://www.linkedin.com/in/mertcaralan/)
-
