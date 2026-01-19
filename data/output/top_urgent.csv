@@ -1,0 +1,10 @@
+review_id,category,urgency,rating,thumbs_up,priority_score,summary
+gp_0005,payment,high,1,30,170,User experienced a payment failure despite money being deducted.
+gp_0001,bug,high,1,12,152,The game crashes when accessing the shop.
+gp_0006,bug,high,2,14,144,The app freezes consistently on level 3.
+gp_0002,ads,medium,2,8,88,Frequent ads after the update negatively impact the user experience.
+gp_0010,feature_request,low,3,6,36,User requests the return of the old daily rewards system.
+gp_0008,complaint,low,3,3,33,The game requires constant internet access.
+gp_0003,praise,low,5,21,31,User appreciates the visuals and outfits in the app.
+gp_0004,feature_request,low,4,5,25,User requests additional levels due to completing the game quickly.
+gp_0009,performance,low,4,2,22,The game is enjoyable but experiences slow loading times occasionally.

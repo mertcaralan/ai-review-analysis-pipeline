@@ -1,9 +1,13 @@
 import pandas as pd
 
 
-def add_priority_score(df: pd.DataFrame) -> pd.DataFrame:
+def add_priority_score(
+    results_df: pd.DataFrame, payload_df: pd.DataFrame
+) -> pd.DataFrame:
     """
     Add priority_score column based on urgency, rating, and thumbs_up.
+
+    Merges rating and thumbs_up from payload_df into results_df.
 
     Formula:
     - urgency_weight: high=100, medium=50, low=10
@@ -11,6 +15,11 @@ def add_priority_score(df: pd.DataFrame) -> pd.DataFrame:
     - thumbs_bonus: min(thumbs_up, 50)
     - priority_score = urgency_weight + rating_penalty + thumbs_bonus
     """
+
+    # Merge rating and thumbs_up from payloads
+    df = results_df.merge(
+        payload_df[["review_id", "rating", "thumbs_up"]], on="review_id", how="left"
+    )
 
     urgency_weights = {"high": 100, "medium": 50, "low": 10}
 

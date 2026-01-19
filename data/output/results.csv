@@ -1,10 +1,10 @@
-review_id,category,urgency,summary,tags
-gp_0001,bug,high,The game crashes when trying to open the shop.,"['crash', 'shop', 'bug', 'urgent', 'fix']"
-gp_0002,ads,medium,The frequency of ads after the update negatively impacts the user experience.,"['ads_too_frequent', 'user_experience', 'update_issue']"
-gp_0003,praise,low,User appreciates the visuals and outfits in the app.,"['visuals', 'outfits', 'design', 'user_experience', 'positive_feedback']"
-gp_0004,feature_request,low,User requests additional levels due to completing the game quickly.,"['more_levels', 'gameplay', 'user_feedback']"
-gp_0005,payment,high,User experienced a payment failure despite being charged.,"['refund', 'payment_failure', 'user_experience', 'financial_issue', 'customer_support']"
-gp_0006,bug,high,The app freezes consistently on level 3.,"['freezing', 'level_3', 'crash', 'performance', 'bug']"
-gp_0008,complaint,low,The game requires constant internet connectivity.,"['internet_requirement', 'gameplay', 'connectivity']"
-gp_0009,performance,low,The game is enjoyable but has occasional slow loading times.,"['slow_loading', 'gameplay', 'user_experience']"
-gp_0010,feature_request,low,User requests the return of the old daily rewards system.,"['daily_rewards', 'user_feedback', 'feature_improvement']"
+review_id,category,urgency,summary,tags,rating,thumbs_up,priority_score
+gp_0001,bug,high,The game crashes when accessing the shop.,"['crash', 'shop', 'bug', 'urgent', 'fix']",1,12,152
+gp_0002,ads,medium,Frequent ads after the update negatively impact the user experience.,"['ads', 'user_experience', 'update', 'annoyance']",2,8,88
+gp_0003,praise,low,User appreciates the visuals and outfits in the app.,"['visuals', 'outfits', 'design', 'user_experience', 'positive_feedback']",5,21,31
+gp_0004,feature_request,low,User requests additional levels due to completing the game quickly.,"['more_levels', 'gameplay', 'content', 'user_feedback', 'suggestion']",4,5,25
+gp_0005,payment,high,User experienced a payment failure despite money being deducted.,"['refund', 'payment_failure', 'user_experience']",1,30,170
+gp_0006,bug,high,The app freezes consistently on level 3.,"['freezing', 'level_3', 'crash', 'gameplay', 'performance']",2,14,144
+gp_0008,complaint,low,The game requires constant internet access.,"['internet_requirement', 'gameplay', 'connectivity']",3,3,33
+gp_0009,performance,low,The game is enjoyable but experiences slow loading times occasionally.,"['slow_loading', 'gameplay', 'user_experience']",4,2,22
+gp_0010,feature_request,low,User requests the return of the old daily rewards system.,"['daily_rewards', 'user_feedback', 'feature_improvement']",3,6,36

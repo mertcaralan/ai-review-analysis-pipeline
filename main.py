@@ -22,9 +22,9 @@ def main():
     print("[3/3] Running AI analysis...")
     results_df = run_llm_batch(payload_df)
 
-    # Phase 2: Add priority scoring
+    # Phase 2: Add priority scoring (pass payload_df for rating/thumbs_up)
     print("\n[Phase 2] Adding priority scores...")
-    results_df = add_priority_score(results_df)
+    results_df = add_priority_score(results_df, payload_df)
 
     # Save main results
     results_df.to_csv("data/output/results.csv", index=False)
