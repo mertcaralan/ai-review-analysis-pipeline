@@ -103,7 +103,7 @@ ai-review-analysis-pipeline/
 
 ## Input Data
 
-### `data/input/reviews.csv`
+File: [data/input/reviews.csv](data/input/reviews.csv)
 
 Raw user reviews.
 
@@ -127,7 +127,7 @@ Example:
 
 ### Main Results
 
-**File:** `data/output/results.csv`
+File: [data/output/results.csv](data/output/results.csv)
 
 Structured output produced by the LLM and enriched in Phase 2.
 
@@ -152,7 +152,7 @@ Sample:
 
 ### Top Urgent Reviews
 
-**File:** `data/output/top_urgent.csv`
+File: [data/output/top_urgent.csv](data/output/top_urgent.csv)
 
 Top 10 reviews sorted by `priority_score` in descending order.
 
@@ -248,3 +248,4 @@ Shows urgency levels across all analyzed reviews.
 
 GitHub: [https://github.com/mertcaralan](https://github.com/mertcaralan)
 LinkedIn: [https://www.linkedin.com/in/mertcaralan/](https://www.linkedin.com/in/mertcaralan/)
+
