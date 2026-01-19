@@ -1,6 +1,8 @@
-from app.load_reviews import load_and_clean_reviews
 from app.analyze_reviews import build_review_payloads
+from app.load_reviews import load_and_clean_reviews
+from app.priority import add_priority_score
 from app.run_batch import run_llm_batch
+from app.visualize import create_charts, save_top_urgent
 
 
 def main():
@@ -20,20 +22,31 @@ def main():
     print("[3/3] Running AI analysis...")
     results_df = run_llm_batch(payload_df)
 
-    # Save
+    # Phase 2: Add priority scoring
+    print("\n[Phase 2] Adding priority scores...")
+    results_df = add_priority_score(results_df)
+
+    # Save main results
     results_df.to_csv("data/output/results.csv", index=False)
-    print(f"\nDone! Results saved to data/output/results.csv")
+    print(f"Results saved: data/output/results.csv")
+
+    # Save top urgent
+    save_top_urgent(results_df, "data/output/top_urgent.csv")
+
+    # Create visualizations
+    create_charts(results_df, "data/output/charts")
 
     # Show summary
     print(f"\nSummary:")
     print(f"Categories: {results_df['category'].value_counts().to_dict()}")
     print(f"Urgency: {results_df['urgency'].value_counts().to_dict()}")
 
-    # Show top urgent
-    urgent = results_df[results_df["urgency"] == "high"]
-    if len(urgent) > 0:
-        print(f"\n{len(urgent)} high urgency reviews found")
-        print(urgent[["review_id", "category", "summary"]].head())
+    # Show top 3 urgent (preview)
+    print(f"\nTop 3 Urgent Reviews:")
+    top_3 = results_df.nlargest(3, "priority_score")[
+        ["review_id", "priority_score", "urgency", "summary"]
+    ]
+    print(top_3.to_string(index=False))
 
 
 if __name__ == "__main__":
