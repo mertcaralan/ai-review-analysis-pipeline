@@ -1,5 +1,5 @@
 import pandas as pd
-from load_reviews import load_and_clean_reviews
+from app.load_reviews import load_and_clean_reviews
 
 
 def build_review_payloads(df: pd.DataFrame) -> pd.DataFrame:
