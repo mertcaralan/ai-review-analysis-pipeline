@@ -1,26 +1,40 @@
-# Review Analyzer (Phase 1)
+# Review Analyzer – Phase 2
 
-End-to-end pipeline that processes app store reviews and produces structured outputs (category, urgency, summary, tags).
+End-to-end pipeline that processes app store reviews, produces structured analysis results, and generates prioritization artifacts to support product and QA decision-making.
 
-Status: Phase 1 completed — core pipeline working via CLI.
-
----
-
-## What it does
-
-Given a CSV file of app reviews, the pipeline:
-
-- Cleans the dataset (drops missing review text, removes duplicates)
-- Builds a minimal payload per review
-- Sends each payload to an LLM for analysis
-- Produces a structured result set and saves it to CSV
-- Prints a short console summary and highlights high-urgency items
+Status: Phase 2 completed.
 
 ---
 
-## Quick start
+## Overview
 
-### 1) Setup
+This project takes raw app store reviews in CSV format and processes them through a structured pipeline:
+
+- Cleans and normalizes raw review data
+- Sends reviews to an LLM with a fixed output schema
+- Produces structured, machine-readable results
+- Adds priority scoring for issue triage
+- Generates tabular and visual outputs for fast inspection
+
+The pipeline is designed as a CLI-first data processing tool and can later be extended with automation or an API layer.
+
+---
+
+## Pipeline Flow
+
+1. Load and clean raw reviews
+2. Build minimal payloads per review
+3. Run batch LLM analysis
+4. Save structured results
+5. Apply priority scoring (Phase 2)
+6. Export top urgent reviews
+7. Generate basic visual summaries
+
+---
+
+## Quick Start
+
+### Setup
 
 ```bash
 git clone https://github.com/mertcaralan/ai-review-analysis-pipeline.git
@@ -37,113 +51,194 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 2) Configure environment variables
+### Environment Variables
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set:
+Set the following variable:
 
 ```env
 OPENAI_API_KEY=sk-your-api-key-here
 ```
 
-### 3) Run
+### Run the Pipeline
 
 ```bash
 python main.py
 ```
 
-Output is saved to:
-
-```
-data/output/results.csv
-```
-
 ---
 
-## Project structure
+## Project Structure
 
 ```
 ai-review-analysis-pipeline/
 ├─ app/
-│  ├─ load_reviews.py       # Load & clean raw CSV
-│  ├─ analyze_reviews.py    # Build review payloads
-│  ├─ schema.py             # Output schema (Pydantic)
-│  ├─ prompts.py            # Prompt templates
-│  ├─ llm_client.py         # LLM calls + parsing/validation
-│  └─ run_batch.py          # Batch processing
+│  ├─ load_reviews.py        # Load and clean CSV input
+│  ├─ analyze_reviews.py     # Build LLM payloads
+│  ├─ schema.py              # Output schema (Pydantic)
+│  ├─ prompts.py             # Prompt definitions
+│  ├─ llm_client.py          # LLM client and parsing logic
+│  ├─ run_batch.py           # Batch execution
+│  ├─ priority.py            # Phase 2: priority scoring
+│  └─ visualize.py           # Phase 2: charts and exports
 ├─ data/
 │  ├─ input/
 │  │  └─ reviews.csv
 │  └─ output/
-│     └─ results.csv
-├─ main.py                  # End-to-end runner
+│     ├─ results.csv
+│     ├─ top_urgent.csv
+│     └─ charts/
+│        ├─ category_distribution.png
+│        └─ urgency_distribution.png
+├─ main.py
 ├─ requirements.txt
 ├─ .env.example
-├─ .gitignore
 └─ README.md
 ```
 
 ---
 
-## Input format
+## Input Data
 
-`data/input/reviews.csv` must include the following columns:
+File: [data/input/reviews.csv](data/input/reviews.csv)
 
-* `review_id` (string)
-* `review_text` (string)
-* `rating` (integer, 1–5)
-* `thumbs_up` (integer)
+Raw user reviews.
 
-Minimal example:
-
-```csv
-review_id,review_text,rating,thumbs_up
-rev_001,"App crashes after payment",1,0
-rev_002,"Great game, love it!",5,12
-```
-
----
-
-## Output format
-
-Results are written to `data/output/results.csv` with these fields:
+Required columns:
 
 * `review_id`
-* `category` (bug | payment | ads | performance | feature_request | praise | complaint | other)
-* `urgency` (low | medium | high)
-* `summary` (one sentence)
-* `tags` (list-like content, stored as string in CSV)
+* `review_text`
+* `rating` (1–5)
+* `thumbs_up`
+
+Example:
+
+| review_id | review_text               | rating | thumbs_up |
+| --------- | ------------------------- | ------ | --------- |
+| rev_001   | App crashes after payment | 1      | 0         |
+| rev_002   | Great game, love it       | 5      | 12        |
 
 ---
 
-## Notes
+## Output Data
 
-* LLM output is constrained to a predefined JSON schema and validated.
-* If parsing or validation fails, the pipeline falls back to safe defaults and continues.
-* Designed as a CLI-first pipeline; no API layer yet.
+### Main Results
+
+File: [data/output/results.csv](data/output/results.csv)
+
+Structured output produced by the LLM and enriched in Phase 2.
+
+Columns:
+
+* `review_id`
+* `category`
+* `urgency`
+* `rating`
+* `thumbs_up`
+* `summary`
+* `priority_score`
+
+Sample:
+
+| review_id | category    | urgency | rating | thumbs_up | priority_score | summary                   |
+| --------- | ----------- | ------- | ------ | --------- | -------------- | ------------------------- |
+| rev_001   | payment     | high    | 1      | 0         | 140            | App crashes after payment |
+| rev_004   | performance | high    | 2      | 15        | 145            | Performance very slow     |
+
+---
+
+### Top Urgent Reviews
+
+File: [data/output/top_urgent.csv](data/output/top_urgent.csv)
+
+Top 10 reviews sorted by `priority_score` in descending order.
+
+Purpose: quick triage and escalation.
+
+Columns:
+
+* `review_id`
+* `category`
+* `urgency`
+* `rating`
+* `thumbs_up`
+* `priority_score`
+* `summary`
+
+---
+
+## Priority Scoring (Phase 2)
+
+Priority score is computed to support backlog ordering.
+
+Formula:
+
+```
+priority_score =
+  urgency_weight
++ rating_penalty
++ thumbs_bonus
+```
+
+Where:
+
+* urgency_weight: high = 100, medium = 50, low = 10
+* rating_penalty: (5 - rating) * 10
+* thumbs_bonus: min(thumbs_up, 50)
+
+---
+
+## Visual Outputs
+
+Charts are generated automatically under `data/output/charts/`.
+
+### Category Distribution
+
+```
+data/output/charts/category_distribution.png
+```
+
+Shows how reviews are distributed across issue categories.
+
+![Category Distribution](data/output/charts/category_distribution.png)
+
+---
+
+### Urgency Distribution
+
+```
+data/output/charts/urgency_distribution.png
+```
+
+Shows urgency levels across all analyzed reviews.
+
+![Urgency Distribution](data/output/charts/urgency_distribution.png)
+
+---
+
+## Design Notes
+
+* LLM output is constrained to a fixed JSON schema.
+* All outputs are validated before being written.
+* The pipeline continues gracefully if a single review fails.
+* Designed for reproducibility and auditability.
 
 ---
 
 ## Roadmap
 
-### Phase 2: Prioritization & visibility
+**Phase 3**
 
-* Priority scoring (urgency + rating + thumbs_up)
-* Top urgent reviews table
-* Basic visualizations (category and urgency distributions)
+* Slack or email reporting
+* Scheduled execution
 
-### Phase 3: Automation
+**Phase 4**
 
-* Slack reporting via webhook
-* Scheduled runs (Task Scheduler / cron)
-
-### Phase 4: API layer
-
-* FastAPI endpoints for analysis and result retrieval
-* Integration-ready service layer
+* FastAPI service layer
+* External system integration
 
 ---
 
@@ -151,5 +246,6 @@ Results are written to `data/output/results.csv` with these fields:
 
 **Mert Çaralan**
 
-- **GitHub:** https://github.com/mertcaralan  
-- **LinkedIn:** https://www.linkedin.com/in/mertcaralan/
+GitHub: [https://github.com/mertcaralan](https://github.com/mertcaralan)
+LinkedIn: [https://www.linkedin.com/in/mertcaralan/](https://www.linkedin.com/in/mertcaralan/)
+
