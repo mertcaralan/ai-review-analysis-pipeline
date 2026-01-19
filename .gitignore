@@ -18,9 +18,6 @@ ENV/
 # Environment variables (GİZLİ!)
 .env
 
-# Data files (outputs)
-data/output/*.csv
-data/interim/*.csv
 *.log
 
 # IDE

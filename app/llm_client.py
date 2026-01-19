@@ -1,13 +1,12 @@
-from dotenv import load_dotenv
-
-load_dotenv()
-
-
 import json
+
+from dotenv import load_dotenv
 from openai import OpenAI
+
 from app.prompts import ANALYZE_REVIEW_PROMPT
 from app.schema import ReviewAnalysis
 
+load_dotenv()
 client = OpenAI()
 
 
