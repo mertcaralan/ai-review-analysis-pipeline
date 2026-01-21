@@ -1,0 +1,11 @@
+review_id,category,urgency,rating,thumbs_up,priority_score,summary
+gp_0005,payment,high,1.0,30.0,170.0,User experienced a payment failure despite being charged.
+gp_0028,payment,high,1.0,25.0,165.0,User did not receive diamonds after payment.
+as_0015,bug,high,1.0,22.0,162.0,The app is unusable after the last update due to a black screen.
+gp_0011,bug,high,1.0,18.0,158.0,The tutorial is unresponsive due to a non-functional 'Next' button.
+as_0041,payment,high,1.0,17.0,157.0,User was charged twice for the same pack.
+gp_0017,bug,high,1.0,16.0,156.0,"Login fails with Google, causing a looping issue."
+gp_0042,bug,high,1.0,15.0,155.0,The game crashes when tapping on Events.
+as_0035,bug,high,1.0,13.0,153.0,The game freezes on startup and sometimes doesn't launch at all.
+gp_0001,bug,high,1.0,12.0,152.0,The game crashes when opening the shop.
+as_0039,bug,high,1.0,12.0,152.0,The app crashes when trying to open the shop.
