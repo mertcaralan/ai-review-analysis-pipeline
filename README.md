@@ -1,22 +1,21 @@
-# Review Analyzer – Phase 2
+# Review Analyzer – Phase 3
 
 End-to-end pipeline that processes app store reviews, produces structured analysis results, and generates prioritization artifacts to support product and QA decision-making.
 
-Status: Phase 2 completed.
+Status: Phase 3 completed. FastAPI service layer implemented as an MVP.
 
 ---
 
 ## Overview
 
-This project takes raw app store reviews in CSV format and processes them through a structured pipeline:
+This project processes raw app store reviews in CSV format through a structured analysis pipeline.
 
-* Cleans and normalizes raw review data
-* Sends reviews to an LLM with a fixed output schema
-* Produces structured, machine-readable results
-* Adds priority scoring for issue triage
-* Generates tabular and visual outputs for fast inspection
+It supports two execution modes:
 
-The pipeline is designed as a CLI-first data processing tool and can later be extended with automation or an API layer.
+* CLI mode for local batch processing
+* API mode via FastAPI for dataset management, run execution, and result retrieval
+
+The pipeline is designed to be deterministic, auditable, and easily extensible toward production-grade integrations.
 
 ---
 
@@ -26,9 +25,11 @@ The pipeline is designed as a CLI-first data processing tool and can later be ex
 2. Build minimal payloads per review
 3. Run batch LLM analysis
 4. Save structured results
-5. Apply priority scoring (Phase 2)
+5. Apply priority scoring
 6. Export top urgent reviews
-7. Generate basic visual summaries
+7. Generate visual summaries
+
+The same core pipeline logic is reused in both CLI and API execution paths.
 
 ---
 
@@ -63,11 +64,115 @@ Set the following variable:
 OPENAI_API_KEY=sk-your-api-key-here
 ```
 
-### Run the Pipeline
+## Running the Pipeline
+
+### CLI Mode
 
 ```bash
 python main.py
 ```
+
+CLI execution writes outputs under:
+
+```
+data/output/
+```
+
+---
+
+### API Mode (FastAPI)
+
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+Open:
+
+* [http://localhost:8000](http://localhost:8000)
+* [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## API Usage (FastAPI)
+
+The API exposes endpoints for dataset upload, run execution, result retrieval, and chart serving.
+
+Runs execute asynchronously in the background. Status and logs can be polled during execution.
+
+### Core Endpoints
+
+* `GET /health`
+  API health status and OpenAI configuration check.
+
+* `POST /datasets`
+  Upload a CSV dataset. The file is cleaned using the existing pipeline logic.
+
+* `GET /datasets`
+  List uploaded datasets.
+
+* `GET /datasets/{dataset_id}?n_rows=10`
+  Retrieve dataset metadata with a preview of cleaned rows.
+
+* `DELETE /datasets/{dataset_id}`
+  Delete a dataset and its stored file.
+
+* `POST /runs`
+  Create and start an analysis run for a dataset.
+
+* `GET /runs/{run_id}`
+  Poll run status and progress.
+
+* `GET /runs/{run_id}/logs`
+  Retrieve execution logs.
+
+* `GET /runs/{run_id}/results`
+  Retrieve filtered and paginated results.
+
+* `GET /runs/{run_id}/top-urgent`
+  Retrieve top urgent reviews by priority score.
+
+* `GET /runs/{run_id}/exports/results.csv`
+  Download full results as CSV.
+
+* `GET /runs/{run_id}/exports/top_urgent.csv`
+  Download top urgent results as CSV.
+
+* `GET /runs/{run_id}/charts`
+  List generated charts.
+
+* `GET /runs/{run_id}/charts/{chart_name}`
+  Serve chart images (PNG).
+
+---
+
+### Example API Request
+
+Create a run for an uploaded dataset:
+
+```bash
+curl -X POST http://localhost:8000/runs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "dataset_id": "<dataset_id>",
+    "max_reviews": 50
+  }'
+```
+
+---
+
+### API Storage Notes
+
+The FastAPI layer writes files under:
+
+```
+storage/datasets/
+storage/runs/{run_id}/
+```
+
+This directory is ignored by git.
+
+Note:
+The API layer is intentionally implemented as an MVP. Dataset and run metadata are stored in-memory to prioritize pipeline integration and API ergonomics over persistence. This can be replaced with a database-backed store in a later phase.
 
 ---
 
@@ -75,6 +180,34 @@ python main.py
 
 ```
 ai-review-analysis-pipeline/
+├─ api/
+│  ├─ routers/
+│  │  ├─ __init__.py
+│  │  ├─ health.py           # Health check endpoints
+│  │  ├─ meta.py             # Output schema metadata endpoints
+│  │  ├─ datasets.py         # Dataset upload and management endpoints
+│  │  ├─ runs.py             # Run lifecycle endpoints
+│  │  └─ results.py          # Results, exports, and charts endpoints
+│  ├─ schemas/
+│  │  ├─ __init__.py
+│  │  ├─ common.py           # Shared response models
+│  │  ├─ datasets.py         # Dataset request/response schemas
+│  │  ├─ runs.py             # Run request/response schemas
+│  │  └─ results.py          # Results and charts schemas
+│  ├─ services/
+│  │  ├─ __init__.py
+│  │  ├─ dataset_service.py  # Dataset management and cleaning logic
+│  │  ├─ pipeline_service.py # Orchestrates app/* pipeline modules
+│  │  ├─ run_service.py      # Run lifecycle and result retrieval logic
+│  │  └─ storage_service.py  # File system operations
+│  ├─ storage/
+│  │  ├─ __init__.py
+│  │  ├─ in_memory.py        # In-memory metadata store (MVP)
+│  │  └─ models.py           # Dataset and Run dataclasses
+│  ├─ __init__.py
+│  ├─ config.py              # API configuration (.env via pydantic-settings)
+│  ├─ deps.py                # FastAPI dependency injection
+│  └─ main.py                # FastAPI app entry point
 ├─ app/
 │  ├─ load_reviews.py        # Load and clean CSV input
 │  ├─ analyze_reviews.py     # Build LLM payloads
@@ -96,6 +229,7 @@ ai-review-analysis-pipeline/
 │        ├─ priority_weighted_category.png
 │        ├─ urgency_category_heatmap.png
 │        └─ top_urgent_table.png
+├─ storage/                  # API-generated datasets and run outputs (gitignored)
 ├─ main.py
 ├─ requirements.txt
 ├─ .env.example
@@ -175,7 +309,7 @@ Columns:
 
 ---
 
-## Priority Scoring (Phase 2)
+## Priority Scoring
 
 Priority score is computed to support backlog ordering.
 
@@ -249,12 +383,23 @@ Slack-ready visual table for quick escalation.
 
 ## Dependencies
 
-### Visualization Dependencies
+### Core
 
-The visualization layer introduces the following dependencies:
+* `pandas`
+* `openai`
+* `pydantic`
+
+### Visualization
 
 * `matplotlib`
 * `seaborn`
+
+### API
+
+* `fastapi`
+* `uvicorn[standard]`
+* `python-multipart`
+* `pydantic-settings`
 
 ---
 
@@ -263,6 +408,8 @@ The visualization layer introduces the following dependencies:
 * LLM output is constrained to a fixed JSON schema.
 * All outputs are validated before being written.
 * The pipeline continues gracefully if a single review fails.
+* Existing `app/` modules are reused without modification.
+* API runs are isolated per execution.
 * Designed for reproducibility and auditability.
 
 ---
@@ -298,14 +445,12 @@ This output demonstrates that the pipeline runs end-to-end and produces all expe
 
 ## Roadmap
 
-**Phase 3**
+### Phase 4
 
-* Slack or email reporting
-* Scheduled execution
-
-**Phase 4**
-
-* FastAPI service layer
+* Slack and email reporting
+* Scheduled execution (cron / queue-based)
+* Persistent storage for metadata
+* Authentication and multi-user support
 * External system integration
 
 ---
@@ -313,6 +458,8 @@ This output demonstrates that the pipeline runs end-to-end and produces all expe
 ## Author
 
 **Mert Çaralan**
+
+Information Systems and Technologies / AI and Data Engineering Focus
 
 GitHub: [https://github.com/mertcaralan](https://github.com/mertcaralan)
 LinkedIn: [https://www.linkedin.com/in/mertcaralan/](https://www.linkedin.com/in/mertcaralan/)
