@@ -1,0 +1,51 @@
+review_id,source,app_id,author_name,review_text,rating,thumbs_up,review_timestamp,last_update_timestamp,app_version,device,os_version,language,country,developer_response,response_timestamp
+rev_0001,google_play,com.example.myapp,User 1,"Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum. Lütfen acil çözün.",2,15,2026-01-12T05:37:00Z,2026-01-12T05:42:00Z,3.2.1,Oppo Reno 8,Android 13,tr,TR,"Geri bildiriminiz için teşekkürler, sorunu inceliyoruz.",2026-01-13T10:42:00Z
+rev_0002,google_play,com.example.myapp,User 2,Audio doesn't play in lessons. Lütfen acil çözün.,2,13,2026-01-19T07:14:00Z,2026-01-19T07:19:00Z,3.2.1,OnePlus 10T,Android 12,fr,FR,,
+rev_0003,google_play,com.example.myapp,User 3,"Bende de var: UI looks great, but performance is inconsistent.",3,13,2026-01-18T11:06:00Z,2026-01-18T11:06:00Z,3.0.2,Oppo Reno 8,Android 13,en,TR,,
+rev_0004,app_store,com.example.myapp,User 4,Support never replied to my ticket. (Pixel 7 kullanıyorum),1,6,2026-01-12T01:35:00Z,2026-01-12T01:35:00Z,3.2.0,iPhone 12,iOS 16,fr,FR,,
+rev_0005,app_store,com.example.myapp,User 5,Uygulama çok yavaş açılıyor ve kasıyor.,2,10,2026-01-12T12:24:00Z,2026-01-12T12:24:00Z,3.1.0,iPhone 14 Pro,iPadOS 17,fr,FR,,
+rev_0006,app_store,com.example.myapp,User 6,Verilerim senkronize olmuyor!,2,0,2026-01-23T08:40:00Z,2026-01-23T08:40:00Z,3.0.2,iPhone 12,iOS 17,en,TR,,
+rev_0007,google_play,com.example.myapp,User 7,Crashes when I try to upload a photo!,1,9,2026-01-15T06:52:00Z,2026-01-15T06:52:00Z,3.0.2,Google Pixel 7,Android 13,en,TR,,
+rev_0008,app_store,com.example.myapp,User 8,"Sync works now, thanks!",5,13,2026-01-18T19:56:00Z,2026-01-18T20:26:00Z,3.2.0,iPhone 13,iOS 16,en,US,,
+rev_0009,app_store,com.example.myapp,User 9,"Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum!",2,7,2026-01-18T21:23:00Z,2026-01-18T21:23:00Z,3.2.1,iPhone 12,iOS 16,en,TR,,
+rev_0010,google_play,com.example.myapp,User 10,The app is perfect for daily use.,5,15,2026-01-23T18:10:00Z,2026-01-23T19:10:00Z,3.1.0,Google Pixel 7,Android 12,fr,FR,,
+rev_0011,app_store,com.example.myapp,User 11,Please add a widget and offline mode. — can you fix this?,4,0,2026-01-24T21:46:00Z,2026-01-24T21:46:00Z,3.0.2,iPhone 13,iOS 17,fr,FR,,
+rev_0012,app_store,com.example.myapp,User 12,App Store version is smoother than Android. Lütfen acil çözün.,4,5,2026-01-21T01:48:00Z,2026-01-21T01:48:00Z,3.1.1,iPhone 13,iOS 17,en,US,,
+rev_0013,google_play,com.example.myapp,User 13,App keeps logging me out. Lütfen acil çözün.,2,8,2026-01-10T09:38:00Z,2026-01-10T09:38:00Z,3.2.1,Oppo Reno 8,Android 14,en,US,,
+rev_0014,google_play,com.example.myapp,User 14,"Ödeme ekranında hata veriyor, premium alamıyorum. Lütfen acil çözün.",1,0,2026-01-12T04:46:00Z,2026-01-12T04:51:00Z,3.0.2,Xiaomi Mi 11,Android 12,en,US,,
+rev_0015,google_play,com.example.myapp,User 15,Audio doesn't play in lessons. (34) — can you fix this?,2,4,2026-01-26T11:46:00Z,2026-01-26T12:16:00Z,3.2.1,Oppo Reno 8,Android 13,en,TR,We’re sorry about this. A fix will be included in the next update.,2026-01-28T17:16:00Z
+rev_0016,app_store,com.example.myapp,User 16,Arama özelliği bazen sonuç döndürmüyor. Lütfen acil çözün.,3,9,2026-01-10T19:37:00Z,2026-01-10T19:47:00Z,3.1.1,iPhone 15,iOS 17,de,DE,,
+rev_0017,google_play,com.example.myapp,User 17,Uygulama çok yavaş açılıyor ve kasıyor!,2,9,2026-01-11T21:32:00Z,2026-01-11T21:32:00Z,3.1.1,Samsung Galaxy A54,Android 12,fr,FR,Sorunu çözmek için lütfen uygulamayı güncelleyip tekrar deneyin.,2026-01-13T02:32:00Z
+rev_0018,google_play,com.example.myapp,User 18,"Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum. Tekrar denedim, değişmedi.",2,20,2026-01-14T10:06:00Z,2026-01-14T10:06:00Z,3.2.0,OnePlus 10T,Android 13,fr,FR,,
+rev_0019,app_store,com.example.myapp,User 19,Yeni güncelleme çok iyi olmuş!,4,16,2026-01-15T16:12:00Z,2026-01-15T16:12:00Z,3.0.2,iPhone SE (2022),iOS 17,de,DE,,
+rev_0020,app_store,com.example.myapp,User 20,Crashes when I try to upload a photo. (Pixel 7 kullanıyorum),1,11,2026-01-19T19:51:00Z,2026-01-19T20:51:00Z,3.0.2,iPhone SE (2022),iOS 16,en,TR,,
+rev_0021,google_play,com.example.myapp,User 21,Şifre sıfırlama linki çalışmıyor.,1,18,2026-01-19T01:31:00Z,2026-01-19T01:36:00Z,3.1.0,Oppo Reno 8,Android 14,tr,TR,Sorunu çözmek için lütfen uygulamayı güncelleyip tekrar deneyin.,2026-01-19T10:36:00Z
+rev_0022,google_play,com.example.myapp,User 22,"The app freezes on the login screen. Tekrar denedim, değişmedi.",1,2,2026-01-19T09:44:00Z,2026-01-19T10:14:00Z,3.1.1,Samsung Galaxy S22,Android 13,de,DE,,
+rev_0023,app_store,com.example.myapp,User 23,Verilerim senkronize olmuyor.,2,0,2026-01-11T10:37:00Z,2026-01-11T10:42:00Z,3.0.2,iPhone 14 Pro,iOS 17,en,TR,,
+rev_0024,google_play,com.example.myapp,User 24,Favorilere ekleme bazen kaydetmiyor. Lütfen acil çözün.,2,5,2026-01-18T23:07:00Z,2026-01-18T23:17:00Z,3.1.0,OnePlus 10T,Android 12,tr,TR,We’ve identified the issue and will roll out a patch soon.,2026-01-19T06:17:00Z
+rev_0025,google_play,com.example.myapp,User 25,"Sync works now, thanks! — can you fix this?",5,7,2026-01-15T11:16:00Z,2026-01-15T11:21:00Z,3.1.1,Oppo Reno 8,Android 14,de,DE,,
+rev_0026,google_play,com.example.myapp,User 26,The app is perfect for daily use. (2) (Pixel 7 kullanıyorum),5,16,2026-01-12T12:04:00Z,2026-01-12T12:14:00Z,3.2.1,Google Pixel 7,Android 13,en,US,,
+rev_0027,google_play,com.example.myapp,User 27,"Works perfectly on Wi‑Fi, fails on mobile data.",2,5,2026-01-25T09:19:00Z,2026-01-25T09:29:00Z,3.2.1,Xiaomi Mi 11,Android 12,fr,FR,,
+rev_0028,google_play,com.example.myapp,User 28,Harika arayüz ama pil tüketimi çok yüksek. Lütfen acil çözün.,3,10,2026-01-26T05:35:00Z,2026-01-26T05:35:00Z,3.0.2,Xiaomi Mi 11,Android 14,fr,FR,,
+rev_0029,app_store,com.example.myapp,User 29,Bende de var: Can’t delete my account from the app.,2,4,2026-01-15T17:57:00Z,2026-01-15T18:57:00Z,3.2.0,iPhone 15,iOS 16,en,US,Sorunu çözmek için lütfen uygulamayı güncelleyip tekrar deneyin.,2026-01-17T07:57:00Z
+rev_0030,google_play,com.example.myapp,User 30,Bende de var: The new onboarding is confusing.,3,4,2026-01-22T03:45:00Z,2026-01-22T03:50:00Z,3.2.0,Xiaomi Mi 11,Android 12,tr,TR,,
+rev_0031,google_play,com.example.myapp,User 31,"Dark mode mükemmel, teşekkürler! — can you fix this?",5,5,2026-01-11T06:19:00Z,2026-01-11T06:19:00Z,3.1.0,Samsung Galaxy S22,Android 14,tr,TR,,
+rev_0032,google_play,com.example.myapp,User 32,"Bende de var: Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum. (14)",2,6,2026-01-23T14:47:00Z,2026-01-23T14:47:00Z,3.2.0,Samsung Galaxy A54,Android 14,en,US,,
+rev_0033,google_play,com.example.myapp,User 33,Son güncellemeden sonra uygulama sürekli çöküyor. Lütfen acil çözün.,1,1,2026-01-16T01:10:00Z,2026-01-16T02:10:00Z,3.1.0,Samsung Galaxy A54,Android 13,en,TR,,
+rev_0034,app_store,com.example.myapp,User 34,"Keşke offline mod olsa. Tekrar denedim, değişmedi.",4,20,2026-01-16T21:52:00Z,2026-01-16T22:52:00Z,3.1.1,iPhone SE (2022),iOS 16,tr,TR,,
+rev_0035,google_play,com.example.myapp,User 35,Keşke offline mod olsa. (Pixel 7 kullanıyorum),4,18,2026-01-17T20:41:00Z,2026-01-17T20:51:00Z,3.1.1,Samsung Galaxy S22,Android 14,en,TR,,
+rev_0036,app_store,com.example.myapp,User 36,Bende de var: Arama özelliği bazen sonuç döndürmüyor.,3,0,2026-01-11T04:06:00Z,2026-01-11T04:16:00Z,3.1.1,iPhone 12,iOS 16,fr,FR,,
+rev_0037,app_store,com.example.myapp,User 37,App Store version is smoother than Android. — can you fix this?,4,17,2026-01-15T19:02:00Z,2026-01-15T19:32:00Z,3.1.0,iPad Air (5th gen),iOS 17,en,US,,
+rev_0038,app_store,com.example.myapp,User 38,App crashes on iPad when rotating screen!,2,16,2026-01-18T03:27:00Z,2026-01-18T03:27:00Z,3.1.0,iPhone 15,iPadOS 17,tr,TR,,
+rev_0039,app_store,com.example.myapp,User 39,Favorilere ekleme bazen kaydetmiyor.,3,6,2026-01-17T08:25:00Z,2026-01-17T08:55:00Z,3.2.0,iPhone 12,iPadOS 17,fr,FR,,
+rev_0040,app_store,com.example.myapp,User 40,Payment screen stuck on loading!,1,12,2026-01-23T12:36:00Z,2026-01-23T12:36:00Z,3.1.0,iPhone 14 Pro,iOS 16,fr,FR,"Geri bildiriminiz için teşekkürler, sorunu inceliyoruz.",2026-01-25T04:36:00Z
+rev_0041,app_store,com.example.myapp,User 41,App keeps logging me out!,2,0,2026-01-20T11:50:00Z,2026-01-20T12:50:00Z,3.2.1,iPhone SE (2022),iPadOS 17,en,TR,,
+rev_0042,google_play,com.example.myapp,User 42,The new onboarding is confusing. — can you fix this?,3,11,2026-01-24T17:19:00Z,2026-01-24T17:19:00Z,3.1.0,OnePlus 10T,Android 14,en,US,,
+rev_0043,google_play,com.example.myapp,User 43,"Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum. (Pixel 7 kullanıyorum)",2,8,2026-01-14T12:45:00Z,2026-01-14T13:15:00Z,3.2.1,Samsung Galaxy S22,Android 12,en,TR,Sorunu çözmek için lütfen uygulamayı güncelleyip tekrar deneyin.,2026-01-15T22:15:00Z
+rev_0044,google_play,com.example.myapp,User 44,Push bildirimleri gecikmeli geliyor. Lütfen acil çözün.,3,1,2026-01-20T06:03:00Z,2026-01-20T06:13:00Z,3.2.1,Samsung Galaxy S22,Android 13,tr,TR,,
+rev_0045,google_play,com.example.myapp,User 45,Please fix Turkish characters in search. (Pixel 7 kullanıyorum),3,16,2026-01-23T10:52:00Z,2026-01-23T11:22:00Z,3.2.0,Google Pixel 7,Android 12,tr,TR,,
+rev_0046,app_store,com.example.myapp,User 46,"Everything is fine but fonts are too small. Tekrar denedim, değişmedi.",4,7,2026-01-26T09:15:00Z,2026-01-26T10:15:00Z,3.1.1,iPhone SE (2022),iOS 16,fr,FR,,
+rev_0047,app_store,com.example.myapp,User 47,"Bende de var: Uygulama açılışta takılıyor, cache temizlemek zorunda kalıyorum.",2,7,2026-01-17T04:57:00Z,2026-01-17T05:07:00Z,3.1.1,iPhone SE (2022),iPadOS 17,fr,FR,Thanks for reporting—our team is investigating.,2026-01-18T12:07:00Z
+rev_0048,app_store,com.example.myapp,User 48,Uygulama çok yavaş açılıyor ve kasıyor. (Pixel 7 kullanıyorum),2,3,2026-01-20T07:26:00Z,2026-01-20T07:26:00Z,3.2.1,iPad Air (5th gen),iOS 16,en,TR,Sorunu çözmek için lütfen uygulamayı güncelleyip tekrar deneyin.,2026-01-22T10:26:00Z
+rev_0049,google_play,com.example.myapp,User 49,Bende de var: Login sonrası siyah ekran oluyor.,1,0,2026-01-21T20:47:00Z,2026-01-21T21:17:00Z,3.2.0,Google Pixel 7,Android 13,fr,FR,,
+rev_0050,google_play,com.example.myapp,User 50,App Store version is smoother than Android. (Pixel 7 kullanıyorum),5,16,2026-01-25T19:10:00Z,2026-01-25T20:10:00Z,3.2.0,Samsung Galaxy A54,Android 13,de,DE,,
