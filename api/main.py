@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.config import get_settings
-from api.routers import health, meta, datasets, runs, results
+from api.routers import health, meta, datasets, runs, results, summary
 
 settings = get_settings()
 
@@ -26,6 +26,7 @@ app.include_router(meta.router)
 app.include_router(datasets.router)
 app.include_router(runs.router)
 app.include_router(results.router)
+app.include_router(summary.router)
 
 
 @app.get("/")
@@ -37,5 +38,10 @@ def root():
         "docs": "/docs",
         "redoc": "/redoc",
         "health": "/health",
-        "endpoints": {"datasets": "/datasets", "runs": "/runs", "meta": "/meta/schema"},
+        "endpoints": {
+            "datasets": "/datasets",
+            "runs": "/runs",
+            "summary": "/runs/{run_id}/summary",
+            "meta": "/meta/schema",
+        },
     }
