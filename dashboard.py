@@ -95,7 +95,6 @@ class ApiClient:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
-        # API returns list of run objects directly
         runs_data = response.json()
         return [
             RunInfo(
@@ -549,6 +548,193 @@ def render_actionable_insights(top_issues: list[TopIssue]):
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
+def render_overview_tab(summary: RunSummary):
+    """Render Overview tab content."""
+    render_executive_highlights(summary.kpis)
+
+    st.divider()
+
+    render_alert_center(summary.alerts, summary.kpis, summary.business_areas)
+
+    st.divider()
+
+    render_business_area_overview(summary.business_areas, summary.trends)
+
+    st.divider()
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        render_business_area_chart(summary.business_areas)
+
+    with col2:
+        render_trend_chart(summary.trends)
+
+    st.divider()
+
+    render_actionable_insights(summary.top_issues)
+
+
+def render_charts_tab(client: ApiClient, run_id: str):
+    """Render Charts tab content."""
+    st.subheader("Generated Visualizations")
+
+    try:
+        charts = fetch_charts(client, run_id)
+
+        if not charts:
+            st.info("No charts available for this run")
+            return
+
+        for chart in charts:
+            chart_name = chart["name"]
+            display_name = chart["display_name"]
+
+            st.markdown(f"### {display_name}")
+
+            chart_data = fetch_chart_png(client, run_id, chart_name)
+            st.image(chart_data, use_column_width=True)
+
+            st.divider()
+
+    except Exception as e:
+        st.error(f"Error loading charts: {str(e)}")
+
+
+def render_top_urgent_tab(client: ApiClient, run_id: str):
+    """Render Top Urgent tab content."""
+    st.subheader("Top Urgent Reviews")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        limit = st.slider(
+            "Number of reviews", min_value=5, max_value=50, value=10, step=5
+        )
+
+    with col2:
+        st.write("")
+        st.write("")
+        try:
+            csv_data = client.download_export(run_id, "top_urgent.csv")
+            st.download_button(
+                label="Download CSV",
+                data=csv_data,
+                file_name=f"top_urgent_{run_id[:8]}.csv",
+                mime="text/csv",
+            )
+        except Exception as e:
+            st.error(f"Download failed: {str(e)}")
+
+    try:
+        df = fetch_top_urgent(client, run_id, limit)
+
+        if df.empty:
+            st.info("No urgent reviews found")
+            return
+
+        st.dataframe(
+            df[
+                [
+                    "review_id",
+                    "category",
+                    "urgency",
+                    "priority_score",
+                    "rating",
+                    "thumbs_up",
+                    "summary",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.caption(
+            f"Showing top {len(df)} reviews sorted by priority score (descending)"
+        )
+
+    except Exception as e:
+        st.error(f"Error loading top urgent reviews: {str(e)}")
+
+
+def render_results_tab(client: ApiClient, run_id: str):
+    """Render Results tab content."""
+    st.subheader("All Analysis Results")
+
+    col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
+
+    with col1:
+        category_filter = st.selectbox(
+            "Category",
+            options=["All"]
+            + [
+                "bug",
+                "payment",
+                "ads",
+                "performance",
+                "feature_request",
+                "ui_ux",
+                "praise",
+                "complaint",
+                "other",
+            ],
+        )
+
+    with col2:
+        urgency_filter = st.selectbox(
+            "Urgency", options=["All", "high", "medium", "low"]
+        )
+
+    with col3:
+        limit = st.selectbox("Limit", options=[50, 100, 200, 500], index=1)
+
+    with col4:
+        st.write("")
+        st.write("")
+        try:
+            csv_data = client.download_export(run_id, "results.csv")
+            st.download_button(
+                label="Download Full CSV",
+                data=csv_data,
+                file_name=f"results_{run_id[:8]}.csv",
+                mime="text/csv",
+            )
+        except Exception as e:
+            st.error(f"Download failed: {str(e)}")
+
+    try:
+        category = None if category_filter == "All" else category_filter
+        urgency = None if urgency_filter == "All" else urgency_filter
+
+        df = fetch_results(client, run_id, category, urgency, limit)
+
+        if df.empty:
+            st.info("No results found with current filters")
+            return
+
+        st.dataframe(
+            df[
+                [
+                    "review_id",
+                    "category",
+                    "urgency",
+                    "priority_score",
+                    "rating",
+                    "thumbs_up",
+                    "summary",
+                    "tags",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.caption(f"Showing {len(df)} results (filtered)")
+
+    except Exception as e:
+        st.error(f"Error loading results: {str(e)}")
+
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -600,35 +786,26 @@ def main():
         st.error(f"Error loading runs: {str(e)}")
         st.stop()
 
-    # Load selected run summary
+    # Main Content - Tabs
     try:
         with st.spinner("Loading analysis data..."):
             summary = fetch_summary(client, selected_run_id)
 
-        # Overview Tab Content
-        render_executive_highlights(summary.kpis)
+        tab1, tab2, tab3, tab4 = st.tabs(
+            ["Overview", "Charts", "Top Urgent", "Results"]
+        )
 
-        st.divider()
+        with tab1:
+            render_overview_tab(summary)
 
-        render_alert_center(summary.alerts, summary.kpis, summary.business_areas)
+        with tab2:
+            render_charts_tab(client, selected_run_id)
 
-        st.divider()
+        with tab3:
+            render_top_urgent_tab(client, selected_run_id)
 
-        render_business_area_overview(summary.business_areas, summary.trends)
-
-        st.divider()
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            render_business_area_chart(summary.business_areas)
-
-        with col2:
-            render_trend_chart(summary.trends)
-
-        st.divider()
-
-        render_actionable_insights(summary.top_issues)
+        with tab4:
+            render_results_tab(client, selected_run_id)
 
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
