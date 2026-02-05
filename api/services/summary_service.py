@@ -24,6 +24,8 @@ class SummaryService:
     HIGH_URGENCY_THRESHOLD = 0.30
     FRAUD_THRESHOLD = 0.10
     DELTA_THRESHOLD = 0.20
+    CRITICAL_PRIORITY_THRESHOLD = 120
+    MIN_RISK_SAMPLE_SIZE = 5
 
     def __init__(self, store: InMemoryStore, runs_dir: Path):
         self.store = store
@@ -72,7 +74,10 @@ class SummaryService:
         high_urgency = df[df["urgency"] == "high"]
         high_urgency_count = len(high_urgency)
 
-        critical = df[(df["urgency"] == "high") & (df["rating"] <= 2)]
+        critical = df[
+            (df["urgency"] == "high")
+            & (df["priority_score"] >= self.CRITICAL_PRIORITY_THRESHOLD)
+        ]
         critical_count = len(critical)
 
         total_impact = df["priority_score"].sum()
@@ -81,9 +86,17 @@ class SummaryService:
         category_impact = df.groupby("category")["priority_score"].sum()
         top_category = category_impact.idxmax() if len(category_impact) > 0 else "none"
 
-        # Simple fraud heuristic: payment issues with low rating
-        fraud_keywords = ["scam", "fraud", "cheat", "steal", "unauthorized"]
-        fraud_reviews = df[
+        # Enhanced fraud heuristic: keywords + duplicate patterns
+        fraud_keywords = [
+            "scam",
+            "fraud",
+            "cheat",
+            "steal",
+            "unauthorized",
+            "refund",
+            "chargeback",
+        ]
+        keyword_fraud = df[
             (df["category"] == "payment")
             & (df["rating"] <= 2)
             & (
@@ -92,7 +105,17 @@ class SummaryService:
                 .str.contains("|".join(fraud_keywords), na=False)
             )
         ]
-        fraud_ratio = len(fraud_reviews) / total if total > 0 else 0.0
+
+        # Detect duplicate summaries (potential fake review patterns)
+        summary_counts = df["summary"].value_counts()
+        duplicate_summaries = summary_counts[summary_counts >= 3].index
+        duplicate_fraud = df[df["summary"].isin(duplicate_summaries)]
+
+        # Combine both indicators (use union to avoid double-counting)
+        fraud_review_ids = set(keyword_fraud["review_id"]).union(
+            set(duplicate_fraud["review_id"])
+        )
+        fraud_ratio = len(fraud_review_ids) / total if total > 0 else 0.0
 
         return KPIMetrics(
             total_reviews=total,
@@ -104,12 +127,72 @@ class SummaryService:
             fraud_ratio=fraud_ratio if fraud_ratio > 0 else None,
         )
 
+    def _reassign_complaints(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Reassign complaint reviews to business areas based on content."""
+        df = df.copy()
+
+        complaint_mask = df["category"] == "complaint"
+        complaints = df[complaint_mask]
+
+        for idx in complaints.index:
+            summary_lower = str(df.at[idx, "summary"]).lower()
+
+            # Acquisition indicators
+            if any(
+                kw in summary_lower
+                for kw in [
+                    "onboarding",
+                    "tutorial",
+                    "first time",
+                    "first-time",
+                    "new user",
+                ]
+            ):
+                df.at[idx, "business_area"] = "acquisition"
+
+            # Monetization indicators
+            elif any(
+                kw in summary_lower
+                for kw in ["payment", "refund", "support", "subscription", "purchase"]
+            ):
+                df.at[idx, "business_area"] = "monetization"
+
+            # Retention indicators
+            elif any(
+                kw in summary_lower
+                for kw in ["crash", "freeze", "login", "bug", "error"]
+            ):
+                df.at[idx, "business_area"] = "retention"
+
+            else:
+                df.at[idx, "business_area"] = "other"
+
+        return df
+
     def _compute_business_areas(self, df: pd.DataFrame) -> list[BusinessArea]:
         """Map categories to business areas."""
+        # Add business_area column for dynamic mapping
+        df = df.copy()
+        df["business_area"] = "other"
+
+        # Map known categories
+        df.loc[df["category"].isin(self.RETENTION_CATEGORIES), "business_area"] = (
+            "retention"
+        )
+        df.loc[df["category"].isin(self.MONETIZATION_CATEGORIES), "business_area"] = (
+            "monetization"
+        )
+        df.loc[df["category"].isin(self.ACQUISITION_CATEGORIES), "business_area"] = (
+            "acquisition"
+        )
+
+        # Reassign complaints intelligently
+        df = self._reassign_complaints(df)
+
         areas = []
 
         # Retention
-        retention_df = df[df["category"].isin(self.RETENTION_CATEGORIES)]
+        retention_df = df[df["business_area"] == "retention"]
         retention_impact = (
             retention_df["priority_score"].sum() if len(retention_df) > 0 else 0.0
         )
@@ -124,7 +207,7 @@ class SummaryService:
         )
 
         # Monetization
-        monetization_df = df[df["category"].isin(self.MONETIZATION_CATEGORIES)]
+        monetization_df = df[df["business_area"] == "monetization"]
         monetization_impact = (
             monetization_df["priority_score"].sum() if len(monetization_df) > 0 else 0.0
         )
@@ -139,7 +222,7 @@ class SummaryService:
         )
 
         # Acquisition
-        acquisition_df = df[df["category"].isin(self.ACQUISITION_CATEGORIES)]
+        acquisition_df = df[df["business_area"] == "acquisition"]
         acquisition_impact = (
             acquisition_df["priority_score"].sum() if len(acquisition_df) > 0 else 0.0
         )
@@ -158,6 +241,10 @@ class SummaryService:
     def _calculate_risk_level(self, df: pd.DataFrame) -> str:
         """Determine risk level based on urgency distribution."""
         if len(df) == 0:
+            return "low"
+
+        # Require minimum sample size to avoid statistical noise
+        if len(df) < self.MIN_RISK_SAMPLE_SIZE:
             return "low"
 
         high_ratio = len(df[df["urgency"] == "high"]) / len(df)
