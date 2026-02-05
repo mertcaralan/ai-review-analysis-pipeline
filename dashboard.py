@@ -3,13 +3,14 @@ import requests
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from typing import Protocol, Optional
+from typing import Optional
 from dataclasses import dataclass
 import os
+from io import BytesIO
 
 
 # ============================================================================
-# DATA SOURCE ABSTRACTION (Future-proof for SQL migration)
+# DATA MODELS
 # ============================================================================
 
 
@@ -68,30 +69,53 @@ class RunSummary:
     trends: TrendData
 
 
-class SummaryDataSource(Protocol):
-    """Abstract interface for summary data retrieval."""
+@dataclass
+class RunInfo:
+    run_id: str
+    dataset_id: str
+    status: str
+    total_reviews: int
+    created_at: str
 
-    def get_summary(self, run_id: str) -> RunSummary:
-        """Fetch run summary from data source."""
-        ...
+
+# ============================================================================
+# API CLIENT
+# ============================================================================
 
 
-class ApiSummaryDataSource:
-    """API-based summary data source (current implementation)."""
+class ApiClient:
+    """Centralized API access layer."""
 
     def __init__(self, base_url: str):
         self.base_url = base_url.rstrip("/")
 
-    def get_summary(self, run_id: str) -> RunSummary:
-        """Fetch summary from FastAPI endpoint."""
-        url = f"{self.base_url}/runs/{run_id}/summary"
+    def list_runs(self) -> list[RunInfo]:
+        """Fetch all runs from API."""
+        url = f"{self.base_url}/runs"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
 
+        # API returns list of run objects directly
+        runs_data = response.json()
+        return [
+            RunInfo(
+                run_id=r["run_id"],
+                dataset_id=r["dataset_id"],
+                status=r["status"],
+                total_reviews=r.get("total_reviews", 0),
+                created_at=r["created_at"],
+            )
+            for r in runs_data
+        ]
+
+    def get_summary(self, run_id: str) -> RunSummary:
+        """Fetch run summary."""
+        url = f"{self.base_url}/runs/{run_id}/summary"
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
         data = response.json()
 
-        # Parse nested structures
         kpis = KPIMetrics(**data["kpis"])
         business_areas = [BusinessArea(**area) for area in data["business_areas"]]
         top_issues = [TopIssue(**issue) for issue in data["top_issues"]]
@@ -106,6 +130,110 @@ class ApiSummaryDataSource:
             alerts=alerts,
             trends=trends,
         )
+
+    def get_results(
+        self,
+        run_id: str,
+        category: Optional[str] = None,
+        urgency: Optional[str] = None,
+        limit: int = 100,
+    ) -> pd.DataFrame:
+        """Fetch results with optional filters."""
+        url = f"{self.base_url}/runs/{run_id}/results"
+        params = {"limit": limit}
+        if category:
+            params["category"] = category
+        if urgency:
+            params["urgency"] = urgency
+
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        return pd.DataFrame(data["results"])
+
+    def get_top_urgent(self, run_id: str, limit: int = 10) -> pd.DataFrame:
+        """Fetch top urgent reviews."""
+        url = f"{self.base_url}/runs/{run_id}/top-urgent"
+        params = {"limit": limit}
+
+        response = requests.get(url, params=params, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        return pd.DataFrame(data["results"])
+
+    def list_charts(self, run_id: str) -> list[dict]:
+        """List available charts for a run."""
+        url = f"{self.base_url}/runs/{run_id}/charts"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        data = response.json()
+        return data["charts"]
+
+    def get_chart_png(self, run_id: str, chart_name: str) -> bytes:
+        """Download chart PNG."""
+        url = f"{self.base_url}/runs/{run_id}/charts/{chart_name}"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        return response.content
+
+    def download_export(self, run_id: str, export_name: str) -> bytes:
+        """Download CSV export."""
+        url = f"{self.base_url}/runs/{run_id}/exports/{export_name}"
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+
+        return response.content
+
+
+# ============================================================================
+# CACHED DATA FETCHERS
+# ============================================================================
+
+
+@st.cache_data(ttl=60)
+def fetch_runs(_client: ApiClient) -> list[RunInfo]:
+    """Cached run list fetcher."""
+    return _client.list_runs()
+
+
+@st.cache_data(ttl=300)
+def fetch_summary(_client: ApiClient, run_id: str) -> RunSummary:
+    """Cached summary fetcher."""
+    return _client.get_summary(run_id)
+
+
+@st.cache_data(ttl=300)
+def fetch_results(
+    _client: ApiClient,
+    run_id: str,
+    category: Optional[str],
+    urgency: Optional[str],
+    limit: int,
+) -> pd.DataFrame:
+    """Cached results fetcher."""
+    return _client.get_results(run_id, category, urgency, limit)
+
+
+@st.cache_data(ttl=300)
+def fetch_top_urgent(_client: ApiClient, run_id: str, limit: int) -> pd.DataFrame:
+    """Cached top urgent fetcher."""
+    return _client.get_top_urgent(run_id, limit)
+
+
+@st.cache_data(ttl=600)
+def fetch_charts(_client: ApiClient, run_id: str) -> list[dict]:
+    """Cached charts list fetcher."""
+    return _client.list_charts(run_id)
+
+
+@st.cache_data(ttl=600)
+def fetch_chart_png(_client: ApiClient, run_id: str, chart_name: str) -> bytes:
+    """Cached chart PNG fetcher."""
+    return _client.get_chart_png(run_id, chart_name)
 
 
 # ============================================================================
@@ -127,7 +255,6 @@ def generate_recommendation(category: str, urgency: str, example_summary: str) -
     """Generate rule-based recommendation for issue."""
     summary_lower = example_summary.lower()
 
-    # Critical patterns
     if "crash" in summary_lower or "freeze" in summary_lower:
         return "Investigate crash logs and error tracking system"
 
@@ -154,7 +281,6 @@ def generate_recommendation(category: str, urgency: str, example_summary: str) -
     ):
         return "Profile application performance and optimize bottlenecks"
 
-    # Category-based fallbacks
     if category == "bug":
         return "Reproduce issue and assign to engineering team"
     elif category == "payment":
@@ -208,18 +334,15 @@ def render_alert_center(
 
     st.subheader("Alert Center")
 
-    # Critical alerts
     for alert in alerts:
         if alert.severity == "high":
             st.error(f"⚠️ {alert.message} ({alert.value:.1%})")
 
-    # Fraud warning
     if kpis.fraud_ratio and kpis.fraud_ratio > 0.10:
         st.error(
             f"⚠️ Fraud ratio ({kpis.fraud_ratio:.1%}) exceeds threshold - immediate review required"
         )
 
-    # Monetization risk
     monetization = next((a for a in business_areas if a.name == "monetization"), None)
     if monetization and monetization.risk_level == "high":
         st.error(
@@ -235,7 +358,6 @@ def render_business_area_overview(
 
     col1, col2, col3 = st.columns(3)
 
-    # Retention
     retention = next((a for a in business_areas if a.name == "retention"), None)
     with col1:
         if retention:
@@ -252,7 +374,6 @@ def render_business_area_overview(
             )
             st.caption(f"{retention.review_count} reviews analyzed")
 
-    # Monetization
     monetization = next((a for a in business_areas if a.name == "monetization"), None)
     with col2:
         if monetization:
@@ -271,7 +392,6 @@ def render_business_area_overview(
             )
             st.caption(f"{monetization.review_count} reviews analyzed")
 
-    # Acquisition
     acquisition = next((a for a in business_areas if a.name == "acquisition"), None)
     with col3:
         if acquisition:
@@ -307,7 +427,6 @@ def render_business_area_chart(business_areas: list[BusinessArea]):
         ]
     )
 
-    # Color mapping for risk levels
     color_map = {"low": "#90EE90", "medium": "#FFA500", "high": "#FF6B6B"}
 
     fig = px.sunburst(
@@ -391,7 +510,6 @@ def render_actionable_insights(top_issues: list[TopIssue]):
     """Render actionable issue buckets with recommendations."""
     st.subheader("Actionable Insights")
 
-    # Prepare data with action priorities
     rows = []
     for issue in top_issues:
         action_bucket, priority_level = classify_action_priority(issue.impact_score)
@@ -416,7 +534,6 @@ def render_actionable_insights(top_issues: list[TopIssue]):
 
     df = pd.DataFrame(rows)
 
-    # Group by priority bucket
     for bucket in ["Fix Immediately", "Investigate", "Monitor"]:
         bucket_df = df[df["Priority"] == bucket]
 
@@ -428,7 +545,6 @@ def render_actionable_insights(top_issues: list[TopIssue]):
             else:
                 st.info(f"**{bucket}** ({len(bucket_df)} issues)")
 
-            # Display without priority column (already in section header)
             display_df = bucket_df.drop(columns=["Priority", "_priority_level"])
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
@@ -446,26 +562,50 @@ def main():
     st.title("Product Health & Revenue Risk Control Panel")
     st.markdown("Executive decision support for mobile game operations")
 
-    # Configuration
     API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000")
-    data_source = ApiSummaryDataSource(API_BASE_URL)
+    client = ApiClient(API_BASE_URL)
 
-    # Input
+    # Sidebar - Run Selection
     st.sidebar.header("Run Selection")
-    run_id = st.sidebar.text_input(
-        "Run ID", placeholder="Enter run ID from analysis pipeline"
-    )
 
-    if not run_id:
-        st.info("Enter a run ID in the sidebar to load the dashboard")
-        return
+    try:
+        with st.spinner("Loading runs..."):
+            all_runs = fetch_runs(client)
 
-    # Fetch data
+        completed_runs = [r for r in all_runs if r.status == "completed"]
+
+        if not completed_runs:
+            st.warning("No completed runs found. Please run an analysis first.")
+            st.stop()
+
+        run_options = {
+            f"{r.run_id[:8]}... ({r.total_reviews} reviews, {r.created_at[:10]})": r.run_id
+            for r in sorted(completed_runs, key=lambda x: x.created_at, reverse=True)
+        }
+
+        selected_label = st.sidebar.selectbox(
+            "Select Run",
+            options=list(run_options.keys()),
+            help="Only completed runs are shown",
+        )
+
+        selected_run_id = run_options[selected_label]
+
+    except requests.exceptions.ConnectionError:
+        st.error(
+            f"Cannot connect to API at {API_BASE_URL}. Ensure the API server is running."
+        )
+        st.stop()
+    except Exception as e:
+        st.error(f"Error loading runs: {str(e)}")
+        st.stop()
+
+    # Load selected run summary
     try:
         with st.spinner("Loading analysis data..."):
-            summary = fetch_summary_cached(data_source, run_id)
+            summary = fetch_summary(client, selected_run_id)
 
-        # Render dashboard sections
+        # Overview Tab Content
         render_executive_highlights(summary.kpis)
 
         st.divider()
@@ -490,25 +630,15 @@ def main():
 
         render_actionable_insights(summary.top_issues)
 
-    except requests.exceptions.ConnectionError:
-        st.error(
-            f"Cannot connect to API at {API_BASE_URL}. Ensure the API server is running."
-        )
     except requests.exceptions.HTTPError as e:
         if e.response.status_code == 404:
-            st.error(f"Run ID '{run_id}' not found")
+            st.error(f"Run '{selected_run_id}' not found")
         elif e.response.status_code == 400:
-            st.error(f"Run '{run_id}' is not completed yet")
+            st.error(f"Run '{selected_run_id}' is not completed yet")
         else:
             st.error(f"API error: {e.response.status_code} - {e.response.text}")
     except Exception as e:
         st.error(f"Unexpected error: {str(e)}")
-
-
-@st.cache_data(ttl=300)
-def fetch_summary_cached(_data_source: ApiSummaryDataSource, run_id: str) -> RunSummary:
-    """Cached wrapper for summary fetching."""
-    return _data_source.get_summary(run_id)
 
 
 if __name__ == "__main__":
