@@ -118,15 +118,12 @@ def create_charts(df: pd.DataFrame, output_dir: str):
     ax.axis("tight")
     ax.axis("off")
 
-    row_colors = [urgency_colors.get(u, "#ffffff") for u in top_10["urgency"]]
-
     table = ax.table(
         cellText=top_10.values,
         colLabels=["Category", "Urgency", "Priority", "Summary"],
         cellLoc="left",
         loc="center",
         colWidths=[0.15, 0.12, 0.12, 0.61],
-        rowColours=row_colors,
     )
 
     table.auto_set_font_size(False)
@@ -136,6 +133,15 @@ def create_charts(df: pd.DataFrame, output_dir: str):
     for i in range(4):
         table[(0, i)].set_facecolor("#1976d2")
         table[(0, i)].set_text_props(weight="bold", color="white")
+
+    for row_idx, urgency_val in enumerate(top_10["urgency"], start=1):
+        color = urgency_colors.get(urgency_val, "#ffffff")
+
+        cell = table[(row_idx, 1)]
+        cell.set_facecolor(color)
+
+        if urgency_val == "high":
+            cell.set_text_props(color="white", weight="bold")
 
     plt.title(
         "Top 10 Urgent Issues (Action Required)", fontsize=14, fontweight="bold", pad=20

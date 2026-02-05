@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any, Tuple
 import traceback
 
 from api.storage.models import Run, RunStatus
@@ -20,6 +20,13 @@ class RunService:
         self.runs_dir = runs_dir
         self.dataset_service = dataset_service
         self.pipeline_service = PipelineService()
+
+    def list_runs(self) -> List[Run]:
+        """
+        Sistemdeki tüm analizleri listeler.
+        Dashboard'un dropdown menüsünü doldurması için kritik öneme sahiptir.
+        """
+        return self.store.list_runs()
 
     def create_run(
         self,
@@ -51,7 +58,6 @@ class RunService:
     async def execute_run(self, run_id: str):
         """
         Execute run in background.
-
         This is called by FastAPI BackgroundTasks.
         """
         run = self.store.get_run(run_id)
@@ -88,8 +94,9 @@ class RunService:
             # Update run to completed
             run.status = RunStatus.COMPLETED
             run.completed_at = datetime.now()
-            run.total_reviews = summary["total_reviews"]
-            run.processed_reviews = summary["total_reviews"]
+            # Ensure values are not None to avoid 500 errors in response schema
+            run.total_reviews = summary.get("total_reviews", 0)
+            run.processed_reviews = summary.get("total_reviews", 0)
             run.logs.append(f"[{datetime.now()}] Run completed successfully")
 
         except Exception as e:
@@ -112,7 +119,7 @@ class RunService:
         limit: int = 100,
         offset: int = 0,
         sort: str = "priority_score",
-    ) -> tuple[list[dict], int]:
+    ) -> Tuple[List[Dict[str, Any]], int]:
         """Get filtered and paginated results from a run."""
         import pandas as pd
 
@@ -142,7 +149,7 @@ class RunService:
 
         return df.to_dict(orient="records"), total
 
-    def get_top_urgent(self, run_id: str, limit: int = 10) -> list[dict]:
+    def get_top_urgent(self, run_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Get top N reviews by priority score."""
         import pandas as pd
 
@@ -151,10 +158,13 @@ class RunService:
             return []
 
         df = pd.read_csv(results_file)
-        df = df.nlargest(limit, "priority_score")
+        # Ensure priority_score exists before sorting
+        if "priority_score" in df.columns:
+            df = df.nlargest(limit, "priority_score")
+
         return df.to_dict(orient="records")
 
-    def list_charts(self, run_id: str) -> list[dict]:
+    def list_charts(self, run_id: str) -> List[Dict[str, Any]]:
         """List all available charts for a run."""
         charts_dir = self.runs_dir / run_id / "charts"
         if not charts_dir.exists():
