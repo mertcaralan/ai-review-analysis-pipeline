@@ -548,7 +548,147 @@ def render_actionable_insights(top_issues: list[TopIssue]):
             st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
-def render_overview_tab(summary: RunSummary):
+def render_mini_compare(client: ApiClient, completed_runs: list[RunInfo]):
+    """Render mini compare section for A/B run comparison."""
+    st.subheader("Mini Compare")
+
+    if len(completed_runs) < 2:
+        st.info(
+            "Comparison requires at least 2 completed runs. Run more analyses to enable comparison."
+        )
+        return
+
+    run_options = {
+        f"{r.run_id[:8]}... ({r.total_reviews} reviews, {r.created_at[:10]})": r.run_id
+        for r in sorted(completed_runs, key=lambda x: x.created_at, reverse=True)
+    }
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        run_a_label = st.selectbox(
+            "Run A (Baseline)", options=list(run_options.keys()), key="compare_run_a"
+        )
+        run_a_id = run_options[run_a_label]
+
+    with col2:
+        run_b_label = st.selectbox(
+            "Run B (Comparison)",
+            options=list(run_options.keys()),
+            index=min(1, len(run_options) - 1),
+            key="compare_run_b",
+        )
+        run_b_id = run_options[run_b_label]
+
+    if run_a_id == run_b_id:
+        st.warning("Please select two different runs to compare")
+        return
+
+    try:
+        summary_a = fetch_summary(client, run_a_id)
+        summary_b = fetch_summary(client, run_b_id)
+
+        st.markdown("#### KPI Delta Comparison")
+
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            delta = (
+                summary_b.kpis.high_urgency_ratio - summary_a.kpis.high_urgency_ratio
+            )
+            st.metric(
+                label="High Urgency Ratio",
+                value=f"{summary_b.kpis.high_urgency_ratio:.1%}",
+                delta=f"{delta:.1%}",
+                delta_color="inverse",
+            )
+
+        with col2:
+            delta = (
+                summary_b.kpis.critical_issues_count
+                - summary_a.kpis.critical_issues_count
+            )
+            st.metric(
+                label="Critical Issues",
+                value=summary_b.kpis.critical_issues_count,
+                delta=f"{delta:+d}",
+                delta_color="inverse",
+            )
+
+        with col3:
+            delta = (
+                summary_b.kpis.total_impact_score - summary_a.kpis.total_impact_score
+            )
+            st.metric(
+                label="Total Impact Score",
+                value=f"{summary_b.kpis.total_impact_score:,.0f}",
+                delta=f"{delta:+,.0f}",
+                delta_color="inverse",
+            )
+
+        with col4:
+            delta_reviews = summary_b.kpis.total_reviews - summary_a.kpis.total_reviews
+            st.metric(
+                label="Total Reviews",
+                value=summary_b.kpis.total_reviews,
+                delta=f"{delta_reviews:+d}",
+            )
+
+        st.markdown("#### Business Area Impact Delta")
+
+        def get_area_impact(areas: list[BusinessArea], name: str) -> float:
+            area = next((a for a in areas if a.name == name), None)
+            return area.impact_score if area else 0.0
+
+        area_names = ["retention", "monetization", "acquisition"]
+        deltas = []
+
+        for name in area_names:
+            impact_a = get_area_impact(summary_a.business_areas, name)
+            impact_b = get_area_impact(summary_b.business_areas, name)
+            deltas.append(impact_b - impact_a)
+
+        df = pd.DataFrame(
+            {"Business Area": [n.title() for n in area_names], "Impact Delta": deltas}
+        )
+
+        colors = ["#FF6B6B" if x > 0 else "#90EE90" for x in deltas]
+
+        fig = go.Figure(
+            data=[
+                go.Bar(
+                    x=df["Business Area"],
+                    y=df["Impact Delta"],
+                    marker_color=colors,
+                    text=[f"{x:+,.0f}" for x in deltas],
+                    textposition="outside",
+                )
+            ]
+        )
+
+        fig.update_layout(
+            title=f"Run B vs Run A: Business Area Impact Change",
+            yaxis_title="Impact Score Delta",
+            xaxis_title="Business Area",
+            height=350,
+            showlegend=False,
+        )
+
+        fig.add_hline(y=0, line_dash="dash", line_color="gray")
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.caption(
+            f"Baseline: Run A ({run_a_id[:8]}...) | Comparison: Run B ({run_b_id[:8]}...)"
+        )
+
+    except Exception as e:
+        st.error(f"Error loading comparison data: {str(e)}")
+
+
+def render_overview_tab(
+    summary: RunSummary, client: ApiClient, completed_runs: list[RunInfo]
+):
     """Render Overview tab content."""
     render_executive_highlights(summary.kpis)
 
@@ -574,10 +714,15 @@ def render_overview_tab(summary: RunSummary):
 
     render_actionable_insights(summary.top_issues)
 
+    st.divider()
+
+    render_mini_compare(client, completed_runs)
+
 
 def render_charts_tab(client: ApiClient, run_id: str):
     """Render Charts tab content."""
     st.subheader("Generated Visualizations")
+    st.caption("Backend-generated charts for detailed analysis")
 
     try:
         charts = fetch_charts(client, run_id)
@@ -604,6 +749,7 @@ def render_charts_tab(client: ApiClient, run_id: str):
 def render_top_urgent_tab(client: ApiClient, run_id: str):
     """Render Top Urgent tab content."""
     st.subheader("Top Urgent Reviews")
+    st.caption("Highest priority issues requiring immediate attention")
 
     col1, col2 = st.columns([3, 1])
 
@@ -660,6 +806,7 @@ def render_top_urgent_tab(client: ApiClient, run_id: str):
 def render_results_tab(client: ApiClient, run_id: str):
     """Render Results tab content."""
     st.subheader("All Analysis Results")
+    st.caption("Filter and explore the complete dataset")
 
     col1, col2, col3, col4 = st.columns([2, 2, 2, 2])
 
@@ -753,6 +900,7 @@ def main():
 
     # Sidebar - Run Selection
     st.sidebar.header("Run Selection")
+    st.sidebar.caption("Select a completed analysis run to view")
 
     try:
         with st.spinner("Loading runs..."):
@@ -762,6 +910,9 @@ def main():
 
         if not completed_runs:
             st.warning("No completed runs found. Please run an analysis first.")
+            st.info(
+                "To create a run:\n1. Start API server\n2. Upload dataset via POST /datasets\n3. Create run via POST /runs"
+            )
             st.stop()
 
         run_options = {
@@ -777,10 +928,15 @@ def main():
 
         selected_run_id = run_options[selected_label]
 
+        st.sidebar.divider()
+        st.sidebar.markdown("**Quick Stats**")
+        st.sidebar.metric("Total Completed Runs", len(completed_runs))
+        st.sidebar.metric("API Status", "Connected")
     except requests.exceptions.ConnectionError:
         st.error(
             f"Cannot connect to API at {API_BASE_URL}. Ensure the API server is running."
         )
+        st.info("Start the API with: `uvicorn api.main:app --reload --port 8000`")
         st.stop()
     except Exception as e:
         st.error(f"Error loading runs: {str(e)}")
@@ -792,11 +948,11 @@ def main():
             summary = fetch_summary(client, selected_run_id)
 
         tab1, tab2, tab3, tab4 = st.tabs(
-            ["Overview", "Charts", "Top Urgent", "Results"]
+            ["📊 Overview", "📈 Charts", "🚨 Top Urgent", "📋 Results"]
         )
 
         with tab1:
-            render_overview_tab(summary)
+            render_overview_tab(summary, client, completed_runs)
 
         with tab2:
             render_charts_tab(client, selected_run_id)
