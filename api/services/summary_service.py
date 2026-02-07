@@ -27,6 +27,10 @@ class SummaryService:
     CRITICAL_PRIORITY_THRESHOLD = 120
     MIN_RISK_SAMPLE_SIZE = 5
 
+    # Impact health thresholds
+    IMPACT_HEALTH_HEALTHY = 40
+    IMPACT_HEALTH_WATCH = 80
+
     def __init__(self, store: InMemoryStore, runs_dir: Path):
         self.store = store
         self.runs_dir = runs_dir
@@ -74,17 +78,40 @@ class SummaryService:
         high_urgency = df[df["urgency"] == "high"]
         high_urgency_count = len(high_urgency)
 
-        critical = df[
-            (df["urgency"] == "high")
-            & (df["priority_score"] >= self.CRITICAL_PRIORITY_THRESHOLD)
+        # Exclude praise from critical issues
+        non_praise = df[df["category"] != "praise"]
+        critical = non_praise[
+            (non_praise["urgency"] == "high")
+            & (non_praise["priority_score"] >= self.CRITICAL_PRIORITY_THRESHOLD)
         ]
         critical_count = len(critical)
 
+        # Total impact (all reviews)
         total_impact = df["priority_score"].sum()
+        impact_per_review = total_impact / total if total > 0 else 0.0
+
+        # Issue impact (excluding praise)
+        issue_impact = (
+            non_praise["priority_score"].sum() if len(non_praise) > 0 else 0.0
+        )
+        issue_impact_per_review = issue_impact / total if total > 0 else 0.0
+
+        # Impact health classification
+        if issue_impact_per_review < self.IMPACT_HEALTH_HEALTHY:
+            impact_health = "healthy"
+        elif issue_impact_per_review < self.IMPACT_HEALTH_WATCH:
+            impact_health = "watch"
+        else:
+            impact_health = "risk"
 
         # Top category by total impact
         category_impact = df.groupby("category")["priority_score"].sum()
         top_category = category_impact.idxmax() if len(category_impact) > 0 else "none"
+
+        # Praise metrics
+        praise = df[df["category"] == "praise"]
+        praise_count = len(praise)
+        praise_ratio = praise_count / total if total > 0 else 0.0
 
         # Enhanced fraud heuristic: keywords + duplicate patterns
         fraud_keywords = [
@@ -123,7 +150,13 @@ class SummaryService:
             high_urgency_ratio=high_urgency_count / total if total > 0 else 0.0,
             critical_issues_count=critical_count,
             total_impact_score=float(total_impact),
+            impact_per_review=float(impact_per_review),
+            issue_impact_score=float(issue_impact),
+            issue_impact_per_review=float(issue_impact_per_review),
+            impact_health=impact_health,
             top_category_by_impact=top_category,
+            praise_count=praise_count,
+            praise_ratio=praise_ratio,
             fraud_ratio=fraud_ratio if fraud_ratio > 0 else None,
         )
 
@@ -257,9 +290,15 @@ class SummaryService:
             return "low"
 
     def _compute_top_issues(self, df: pd.DataFrame, limit: int = 10) -> list[TopIssue]:
-        """Aggregate top issues by category and urgency."""
+        """Aggregate top issues by category and urgency, excluding praise."""
+        # Exclude praise from top issues
+        issues_df = df[df["category"] != "praise"]
+
+        if len(issues_df) == 0:
+            return []
+
         grouped = (
-            df.groupby(["category", "urgency"])
+            issues_df.groupby(["category", "urgency"])
             .agg(
                 {
                     "priority_score": "sum",
@@ -296,13 +335,24 @@ class SummaryService:
         """Generate threshold-based alerts."""
         alerts = []
 
+        # Impact health risk alert
+        if kpis.impact_health == "risk":
+            alerts.append(
+                Alert(
+                    type="impact_health_risk",
+                    severity="high",
+                    message=f"Product health at risk level with {kpis.issue_impact_per_review:.1f} issue impact per review",
+                    value=kpis.issue_impact_per_review,
+                )
+            )
+
         # High urgency ratio alert
         if kpis.high_urgency_ratio > self.HIGH_URGENCY_THRESHOLD:
             alerts.append(
                 Alert(
                     type="high_urgency_ratio",
                     severity="high",
-                    message=f"High urgency reviews exceed {self.HIGH_URGENCY_THRESHOLD:.0%} threshold",
+                    message=f"High urgency reviews exceed {self.HIGH_URGENCY_THRESHOLD:.0%} threshold - immediate triage required",
                     value=kpis.high_urgency_ratio,
                 )
             )
@@ -313,7 +363,7 @@ class SummaryService:
                 Alert(
                     type="fraud_ratio",
                     severity="high",
-                    message=f"Potential fraud reviews exceed {self.FRAUD_THRESHOLD:.0%} threshold",
+                    message=f"Potential fraudulent reviews detected - investigate payment disputes and duplicate patterns",
                     value=kpis.fraud_ratio,
                 )
             )
@@ -325,8 +375,20 @@ class SummaryService:
                 Alert(
                     type="monetization_risk",
                     severity="high",
-                    message="Monetization area shows high risk level",
+                    message=f"Revenue risk elevated - {monetization.review_count} payment-related issues require escalation",
                     value=monetization.impact_score,
+                )
+            )
+
+        # Retention risk alert
+        retention = next((a for a in areas if a.name == "retention"), None)
+        if retention and retention.risk_level == "high":
+            alerts.append(
+                Alert(
+                    type="retention_risk",
+                    severity="high",
+                    message=f"Retention risk elevated - {retention.review_count} critical stability issues detected",
+                    value=retention.impact_score,
                 )
             )
 

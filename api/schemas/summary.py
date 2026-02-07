@@ -8,9 +8,23 @@ class KPIMetrics(BaseModel):
     total_reviews: int
     high_urgency_count: int
     high_urgency_ratio: float = Field(..., description="Ratio of high urgency reviews")
-    critical_issues_count: int = Field(..., description="High urgency AND rating <= 2")
+    critical_issues_count: int = Field(
+        ..., description="High urgency AND priority >= threshold, excluding praise"
+    )
     total_impact_score: float = Field(..., description="Sum of all priority scores")
+    impact_per_review: float = Field(..., description="Average impact per review")
+    issue_impact_score: float = Field(
+        ..., description="Sum of priority scores excluding praise"
+    )
+    issue_impact_per_review: float = Field(
+        ..., description="Average issue impact per review"
+    )
+    impact_health: str = Field(
+        ..., description="Health classification: healthy, watch, or risk"
+    )
     top_category_by_impact: str
+    praise_count: int = Field(..., description="Number of praise reviews")
+    praise_ratio: float = Field(..., description="Ratio of praise reviews")
     fraud_ratio: Optional[float] = Field(
         None, description="Heuristic fraud detection ratio"
     )
