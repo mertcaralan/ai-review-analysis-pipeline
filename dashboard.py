@@ -66,6 +66,8 @@ class TrendData:
     impact_delta_monetization: Optional[float] = None
     impact_delta_acquisition: Optional[float] = None
     new_top_issue: Optional[str] = None
+    previous_run_id: Optional[str] = None
+    app_name: Optional[str] = None
 
 
 @dataclass
@@ -227,6 +229,8 @@ class ApiClient:
             impact_delta_monetization=trends_data.get("impact_delta_monetization"),
             impact_delta_acquisition=trends_data.get("impact_delta_acquisition"),
             new_top_issue=trends_data.get("new_top_issue"),
+            previous_run_id=trends_data.get("previous_run_id"),
+            app_name=trends_data.get("app_name"),
         )
 
         dm = data.get("dataset_metadata")
@@ -469,8 +473,7 @@ def render_alert_center(
     st.markdown("#### What Should We Do Next?")
 
     high_risk_areas = [
-        a for a in business_areas
-        if getattr(a, "risk_level", "") == "high"
+        a for a in business_areas if getattr(a, "risk_level", "") == "high"
     ]
     if high_risk_areas:
         top_risk_area = max(
@@ -597,15 +600,20 @@ def render_business_area_chart(business_areas: list[BusinessArea]):
 
 
 def render_trend_chart(trends: TrendData):
-    """Render trend comparison chart using API trend data."""
+    """Render trend comparison chart using API trend data. Only shown when at least one delta is not null."""
     dr = getattr(trends, "impact_delta_retention", None)
     dm = getattr(trends, "impact_delta_monetization", None)
     da = getattr(trends, "impact_delta_acquisition", None)
     if not any([dr is not None, dm is not None, da is not None]):
-        st.info("Trend comparison requires multiple runs on the same dataset")
+        st.info("Trend comparison requires multiple runs for the same application")
         return
 
-    st.subheader("Trend Analysis vs Previous Run")
+    st.subheader("Trend Analysis")
+    app_name = getattr(trends, "app_name", None) or "Unknown App"
+    short_id = getattr(trends, "previous_run_id", None) or "—"
+    st.caption(
+        f"Trend vs. Previous Analysis for **{app_name}** (Baseline Run ID: {short_id})"
+    )
 
     areas = []
     deltas = []
@@ -621,7 +629,8 @@ def render_trend_chart(trends: TrendData):
         deltas.append(float(da))
 
     df = pd.DataFrame({"Business Area": areas, "Impact Change": deltas})
-    colors = ["#FF6B6B" if x > 0 else "#90EE90" for x in deltas]
+    # Green = decrease in impact (improvement); red = increase (worsening)
+    colors = ["#90EE90" if x < 0 else "#FF6B6B" for x in deltas]
 
     fig = go.Figure(
         data=[
@@ -636,7 +645,6 @@ def render_trend_chart(trends: TrendData):
     )
 
     fig.update_layout(
-        title="Impact Score Change from Previous Run",
         yaxis_title="Change in Impact Score",
         xaxis_title="Business Area",
         height=400,
@@ -902,7 +910,7 @@ def render_charts_tab(base_url: str, run_id: str):
             st.markdown(f"### {display_name}")
 
             chart_data = fetch_chart_png(base_url, run_id, chart_name)
-            st.image(chart_data, use_column_width=True)
+            st.image(chart_data, use_container_width=True)
 
             # Download button for chart
             st.download_button(
@@ -1059,9 +1067,7 @@ def render_results_tab(base_url: str, run_id: str, run_created_at: str):
 
 
 def main():
-    st.set_page_config(
-        page_title="Product Health Control Panel", layout="wide"
-    )
+    st.set_page_config(page_title="Product Health Control Panel", layout="wide")
 
     # Header: app name and version from API when available (set after summary load)
     st.title("Product Health & Revenue Risk Control Panel")

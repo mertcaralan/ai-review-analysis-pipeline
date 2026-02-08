@@ -21,7 +21,7 @@ from api.schemas.summary import (
     DatasetMetadataSummary,
 )
 from api.storage.in_memory import InMemoryStore
-from api.storage.models import RunStatus
+from api.storage.models import Run, RunStatus
 
 logger = logging.getLogger(__name__)
 
@@ -180,8 +180,11 @@ class SummaryService:
         business_areas = self._compute_business_areas(df)
         top_issues = self._compute_top_issues(df)
         alerts = self._generate_alerts(kpis, business_areas)
+        # Get app_name from dataset for app-based trend comparison
+        current_dataset = self.store.get_dataset(run.dataset_id)
+        app_name = getattr(current_dataset, "app_name", None) if current_dataset else None
         trends = self._compute_trends(
-            run_id, run.dataset_id, kpis, business_areas
+            run_id, app_name, kpis, business_areas
         )
 
         # Dataset metadata for header (app_name, app_version, platform)
@@ -498,12 +501,15 @@ class SummaryService:
     def _compute_trends(
         self,
         current_run_id: str,
-        dataset_id: str,
+        app_name: Optional[str],
         current_kpis: KPIMetrics,
         current_areas: list[BusinessArea],
     ) -> TrendData:
-        """Compare with previous completed run for the same dataset."""
-        previous_run = self._find_previous_run(current_run_id, dataset_id)
+        """Compare with previous completed run for the same app_name (cross-dataset)."""
+        if not app_name:
+            # No app_name available, cannot perform app-based comparison
+            return TrendData()
+        previous_run = self._find_previous_run(current_run_id, app_name)
         if not previous_run:
             return TrendData()
 
@@ -541,12 +547,19 @@ class SummaryService:
             prev_top = prev_kpis.top_category_by_impact
             new_top_issue = curr_top if curr_top != prev_top else None
 
+            short_prev_id = (
+                previous_run.run_id[:8]
+                if len(previous_run.run_id) >= 8
+                else previous_run.run_id
+            )
             return TrendData(
                 urgency_delta_percent=urgency_delta,
                 impact_delta_retention=curr_retention - prev_retention,
                 impact_delta_monetization=curr_monetization - prev_monetization,
                 impact_delta_acquisition=curr_acquisition - prev_acquisition,
                 new_top_issue=new_top_issue,
+                previous_run_id=short_prev_id,
+                app_name=app_name,
             )
         except Exception as e:
             logger.warning(
@@ -557,22 +570,52 @@ class SummaryService:
             )
             return TrendData()
 
-    def _find_previous_run(self, current_run_id: str, dataset_id: str):
-        """Find the most recent completed run before current_run_id."""
+    def _find_previous_run(
+        self, current_run_id: str, app_name: str
+    ) -> Optional[Run]:
+        """
+        Find the most recent COMPLETED run with same app_name (cross-dataset), different run_id.
+        
+        Args:
+            current_run_id: The current run's ID to exclude from results
+            app_name: The application name to match (from Dataset.app_name)
+            
+        Returns:
+            The most recent COMPLETED run with matching app_name, or None if not found.
+        """
         all_runs = self.store.list_runs()
         current_run = self.store.get_run(current_run_id)
         if not current_run:
             return None
+        current_completed = getattr(current_run, "completed_at", None)
+        if current_completed is None:
+            return None
 
-        candidates = [
-            r
-            for r in all_runs
-            if r.dataset_id == dataset_id
-            and r.status == RunStatus.COMPLETED
-            and r.run_id != current_run_id
-            and getattr(r, "completed_at", None) is not None
-            and r.completed_at < current_run.completed_at
-        ]
+        # Build a map of dataset_id -> app_name for efficient lookup
+        dataset_app_map: dict[str, Optional[str]] = {}
+        
+        candidates = []
+        for r in all_runs:
+            # Skip if not completed, is current run, or has no completed_at
+            if (
+                r.status != RunStatus.COMPLETED
+                or r.run_id == current_run_id
+                or getattr(r, "completed_at", None) is None
+                or r.completed_at >= current_completed
+            ):
+                continue
+            
+            # Look up app_name for this run's dataset (with caching)
+            if r.dataset_id not in dataset_app_map:
+                dataset = self.store.get_dataset(r.dataset_id)
+                dataset_app_map[r.dataset_id] = (
+                    getattr(dataset, "app_name", None) if dataset else None
+                )
+            
+            # Match if app_name is identical (case-sensitive)
+            if dataset_app_map[r.dataset_id] == app_name:
+                candidates.append(r)
+        
         if not candidates:
             return None
         return max(candidates, key=lambda r: r.completed_at)

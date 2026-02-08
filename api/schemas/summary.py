@@ -104,6 +104,14 @@ class TrendData(BaseModel):
     impact_delta_monetization: Optional[float] = None
     impact_delta_acquisition: Optional[float] = None
     new_top_issue: Optional[str] = None
+    previous_run_id: Optional[str] = Field(
+        None,
+        description="Short ID of the baseline run used for comparison (same app_name)",
+    )
+    app_name: Optional[str] = Field(
+        None,
+        description="Application name used for cross-dataset trend comparison",
+    )
 
 
 class DatasetMetadataSummary(BaseModel):

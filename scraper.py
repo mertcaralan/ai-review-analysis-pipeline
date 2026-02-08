@@ -191,8 +191,8 @@ if __name__ == "__main__":
     # CONFIGURATION - Modify these parameters
     # ========================================================================
 
-    APP_ID = "tr.com.apps.drill.and.collect"  # Change to your app package name
-    REVIEW_COUNT = 100  # Number of reviews to fetch
+    APP_ID = "tr.com.apps.fashion.battle"  # Change to your app package name
+    REVIEW_COUNT = 200  # Number of reviews to fetch
     OUTPUT_FILE = "data/input/reviews.csv"  # Output CSV path
     LANGUAGE = "tr"  # Language code
     COUNTRY = "tr"  # Country code
