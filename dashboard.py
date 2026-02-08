@@ -177,34 +177,66 @@ class ApiClient:
             praise_ratio=kpis_data.get("praise_ratio", 0.0),
         )
 
-        business_areas = [
-            BusinessArea(**area) for area in data.get("business_areas") or []
-        ]
-        top_issues = [
-            TopIssue(
-                category=issue["category"],
-                urgency=issue["urgency"],
-                impact_score=issue["impact_score"],
-                count=issue["count"],
-                example_summary=issue["example_summary"],
-                recommended_action=issue.get("recommended_action"),
-                severity=issue.get("severity"),
-                priority_bucket=issue.get("priority_bucket"),
-            )
-            for issue in data.get("top_issues") or []
-        ]
-        alerts = [Alert(**alert) for alert in data.get("alerts") or []]
-        trends = TrendData(**(data.get("trends") or {}))
+        raw_areas = data.get("business_areas") or []
+        business_areas = []
+        for area in raw_areas:
+            if isinstance(area, dict):
+                business_areas.append(
+                    BusinessArea(
+                        name=area.get("name", ""),
+                        impact_score=float(area.get("impact_score", 0) or 0),
+                        review_count=int(area.get("review_count", 0) or 0),
+                        risk_level=area.get("risk_level", "low"),
+                    )
+                )
+
+        raw_issues = data.get("top_issues") or []
+        top_issues = []
+        for issue in raw_issues:
+            if isinstance(issue, dict):
+                top_issues.append(
+                    TopIssue(
+                        category=issue.get("category", ""),
+                        urgency=issue.get("urgency", ""),
+                        impact_score=float(issue.get("impact_score", 0) or 0),
+                        count=int(issue.get("count", 0) or 0),
+                        example_summary=issue.get("example_summary", ""),
+                        recommended_action=issue.get("recommended_action"),
+                        severity=issue.get("severity"),
+                        priority_bucket=issue.get("priority_bucket"),
+                    )
+                )
+
+        raw_alerts = data.get("alerts") or []
+        alerts = []
+        for alert in raw_alerts:
+            if isinstance(alert, dict):
+                alerts.append(
+                    Alert(
+                        type=alert.get("type", ""),
+                        severity=alert.get("severity", "low"),
+                        message=alert.get("message", ""),
+                        value=float(alert.get("value", 0) or 0),
+                    )
+                )
+
+        trends_data = data.get("trends") or {}
+        trends = TrendData(
+            urgency_delta_percent=trends_data.get("urgency_delta_percent"),
+            impact_delta_retention=trends_data.get("impact_delta_retention"),
+            impact_delta_monetization=trends_data.get("impact_delta_monetization"),
+            impact_delta_acquisition=trends_data.get("impact_delta_acquisition"),
+            new_top_issue=trends_data.get("new_top_issue"),
+        )
+
         dm = data.get("dataset_metadata")
-        dataset_metadata = (
-            DatasetMetadataSummary(
+        dataset_metadata = None
+        if dm and isinstance(dm, dict):
+            dataset_metadata = DatasetMetadataSummary(
                 app_name=dm.get("app_name"),
                 app_version=dm.get("app_version"),
                 platform=dm.get("platform"),
             )
-            if dm
-            else None
-        )
 
         return RunSummary(
             run_id=data.get("run_id", ""),
@@ -234,8 +266,9 @@ class ApiClient:
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
 
-        data = response.json()
-        return pd.DataFrame(data["results"])
+        data = response.json() or {}
+        results = data.get("results") or []
+        return pd.DataFrame(results)
 
     def get_top_urgent(self, run_id: str, limit: int = 10) -> pd.DataFrame:
         """Fetch top urgent reviews."""
@@ -245,8 +278,9 @@ class ApiClient:
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
 
-        data = response.json()
-        return pd.DataFrame(data["results"])
+        data = response.json() or {}
+        results = data.get("results") or []
+        return pd.DataFrame(results)
 
     def list_charts(self, run_id: str) -> list[dict]:
         """List available charts for a run."""
@@ -254,8 +288,8 @@ class ApiClient:
         response = requests.get(url, timeout=30)
         response.raise_for_status()
 
-        data = response.json()
-        return data["charts"]
+        data = response.json() or {}
+        return data.get("charts") or []
 
     def get_chart_png(self, run_id: str, chart_name: str) -> bytes:
         """Download chart PNG."""
@@ -333,188 +367,209 @@ def fetch_chart_png(base_url: str, run_id: str, chart_name: str) -> bytes:
 
 
 def render_impact_health_section(kpis: KPIMetrics):
-    """Render Impact Health section with new KPIs."""
+    """Render Impact Health section using API-provided impact_health, issue_impact_per_review, praise_ratio."""
     st.subheader("Impact Health")
 
     col1, col2, col3, col4 = st.columns(4)
 
+    health = getattr(kpis, "impact_health", "unknown") or "unknown"
     with col1:
-        health_emoji = {"healthy": "✅", "watch": "⚠️", "risk": "🔴", "unknown": "❓"}
         st.metric(
             label="Health Status",
-            value=f"{health_emoji.get(kpis.impact_health, '❓')} {kpis.impact_health.title()}",
+            value=str(health).title(),
         )
         st.caption("Based on issue impact per review")
 
     with col2:
-        st.metric(label="Impact per Review", value=f"{kpis.impact_per_review:.1f}")
+        val = getattr(kpis, "impact_per_review", 0.0) or 0.0
+        st.metric(label="Impact per Review", value=f"{float(val):.1f}")
         st.caption("Average impact across all reviews")
 
     with col3:
-        st.metric(
-            label="Issue Impact per Review", value=f"{kpis.issue_impact_per_review:.1f}"
-        )
+        val = getattr(kpis, "issue_impact_per_review", 0.0) or 0.0
+        st.metric(label="Issue Impact per Review", value=f"{float(val):.1f}")
         st.caption("Impact from issues only (excl. praise)")
 
     with col4:
+        ratio = getattr(kpis, "praise_ratio", 0.0) or 0.0
+        count = getattr(kpis, "praise_count", 0) or 0
         st.metric(
             label="Praise Ratio",
-            value=f"{kpis.praise_ratio:.1%}",
-            delta=f"{kpis.praise_count} wins",
+            value=f"{float(ratio):.1%}",
+            delta=f"{int(count)} wins",
         )
         st.caption("Positive feedback to celebrate")
 
 
 def render_executive_highlights(kpis: KPIMetrics):
-    """Render top-level KPI metrics."""
+    """Render top-level KPI metrics from API (no client-side calculation)."""
     st.subheader("Executive Highlights")
 
     col1, col2, col3, col4, col5 = st.columns(5)
 
+    total = getattr(kpis, "total_reviews", 0) or 0
     with col1:
-        st.metric(label="Total Reviews", value=f"{kpis.total_reviews:,}")
+        st.metric(label="Total Reviews", value=f"{int(total):,}")
 
+    ratio = getattr(kpis, "high_urgency_ratio", 0.0) or 0.0
+    count = getattr(kpis, "high_urgency_count", 0) or 0
     with col2:
         st.metric(
             label="High Urgency Ratio",
-            value=f"{kpis.high_urgency_ratio:.1%}",
-            delta=f"{kpis.high_urgency_count} reviews",
+            value=f"{float(ratio):.1%}",
+            delta=f"{int(count)} reviews",
         )
 
+    critical = getattr(kpis, "critical_issues_count", 0) or 0
     with col3:
-        st.metric(label="Critical Issues", value=kpis.critical_issues_count)
+        st.metric(label="Critical Issues", value=int(critical))
 
+    impact = getattr(kpis, "total_impact_score", 0.0) or 0.0
     with col4:
-        st.metric(label="Total Impact Score", value=f"{kpis.total_impact_score:,.0f}")
+        st.metric(label="Total Impact Score", value=f"{float(impact):,.0f}")
 
+    fraud = getattr(kpis, "fraud_ratio", None)
+    fraud_display = f"{float(fraud):.1%}" if fraud is not None else "N/A"
     with col5:
-        fraud_display = f"{kpis.fraud_ratio:.1%}" if kpis.fraud_ratio else "N/A"
         st.metric(label="Fraud Ratio", value=fraud_display)
 
 
 def render_alert_center(
     alerts: list[Alert], kpis: KPIMetrics, business_areas: list[BusinessArea]
 ):
-    """Render early warning system with severity grouping."""
+    """Render early warning system with severity grouping using API data."""
     st.subheader("Alert Center")
 
-    # Impact health risk warning (even if no alerts)
-    if kpis.impact_health == "risk":
+    health = getattr(kpis, "impact_health", "") or ""
+    issue_impact = getattr(kpis, "issue_impact_per_review", 0.0) or 0.0
+
+    if health == "risk":
         st.error(
-            f"🔴 Product health at RISK level with {kpis.issue_impact_per_review:.1f} issue impact per review. "
-            f"Immediate executive review required."
+            f"Product health at RISK level with {float(issue_impact):.1f} issue impact per review. "
+            "Immediate executive review required."
         )
 
-    # Group alerts by severity
-    high_severity = [a for a in alerts if a.severity == "high"]
-    medium_severity = [a for a in alerts if a.severity == "medium"]
+    high_severity = [a for a in alerts if getattr(a, "severity", "") == "high"]
+    medium_severity = [a for a in alerts if getattr(a, "severity", "") == "medium"]
 
     if high_severity:
         st.markdown("#### High Severity Alerts")
         for alert in high_severity:
-            st.error(f"⚠️ {alert.message}")
+            st.error(getattr(alert, "message", str(alert)))
 
     if medium_severity:
         st.markdown("#### Medium Severity Alerts")
         for alert in medium_severity:
-            st.warning(f"⚠️ {alert.message}")
+            st.warning(getattr(alert, "message", str(alert)))
 
-    if not alerts and kpis.impact_health != "risk":
+    if not alerts and health != "risk":
         st.success("No critical alerts detected")
         return
 
-    # What should we do next?
     st.markdown("#### What Should We Do Next?")
 
-    # Find highest risk business area
-    high_risk_areas = [a for a in business_areas if a.risk_level == "high"]
+    high_risk_areas = [
+        a for a in business_areas
+        if getattr(a, "risk_level", "") == "high"
+    ]
     if high_risk_areas:
-        top_risk_area = max(high_risk_areas, key=lambda x: x.impact_score)
+        top_risk_area = max(
+            high_risk_areas,
+            key=lambda x: float(getattr(x, "impact_score", 0) or 0),
+        )
+        name = getattr(top_risk_area, "name", "Unknown")
+        rc = getattr(top_risk_area, "review_count", 0) or 0
+        isc = float(getattr(top_risk_area, "impact_score", 0) or 0)
         st.warning(
-            f"**Priority 1:** Address {top_risk_area.name} risk "
-            f"({top_risk_area.review_count} critical reviews, {top_risk_area.impact_score:,.0f} impact score)"
+            f"**Priority 1:** Address {name} risk "
+            f"({int(rc)} critical reviews, {isc:,.0f} impact score)"
         )
 
-    # Top issue category (excluding praise)
-    if kpis.top_category_by_impact and kpis.top_category_by_impact != "praise":
+    top_cat = getattr(kpis, "top_category_by_impact", "") or ""
+    if top_cat and top_cat != "praise":
         st.info(
-            f"**Priority 2:** Investigate {kpis.top_category_by_impact} category "
-            f"(highest impact excluding praise)"
+            f"**Priority 2:** Investigate {top_cat} category "
+            "(highest impact excluding praise)"
         )
 
 
 def render_business_area_overview(
     business_areas: list[BusinessArea], trends: TrendData
 ):
-    """Render business area health dashboard."""
+    """Render business area health dashboard using API data."""
     st.subheader("Business Area Overview")
 
     col1, col2, col3 = st.columns(3)
 
-    retention = next((a for a in business_areas if a.name == "retention"), None)
+    retention = next(
+        (a for a in business_areas if getattr(a, "name", "") == "retention"),
+        None,
+    )
     with col1:
         if retention:
-            delta_val = (
-                trends.impact_delta_retention if trends.impact_delta_retention else None
-            )
-            delta_color = "inverse" if delta_val and delta_val > 0 else "normal"
-
+            delta_val = getattr(trends, "impact_delta_retention", None)
+            delta_color = "inverse" if delta_val and float(delta_val) > 0 else "normal"
+            risk = getattr(retention, "risk_level", "low") or "low"
+            impact = float(getattr(retention, "impact_score", 0) or 0)
+            rc = int(getattr(retention, "review_count", 0) or 0)
             st.metric(
-                label=f"Retention ({retention.risk_level.upper()} RISK)",
-                value=f"{retention.impact_score:,.0f}",
-                delta=f"{delta_val:+,.0f}" if delta_val else None,
+                label=f"Retention ({risk.upper()} RISK)",
+                value=f"{impact:,.0f}",
+                delta=f"{float(delta_val):+,.0f}" if delta_val is not None else None,
                 delta_color=delta_color,
             )
-            st.caption(f"{retention.review_count} reviews analyzed")
+            st.caption(f"{rc} reviews analyzed")
 
-    monetization = next((a for a in business_areas if a.name == "monetization"), None)
+    monetization = next(
+        (a for a in business_areas if getattr(a, "name", "") == "monetization"),
+        None,
+    )
     with col2:
         if monetization:
-            delta_val = (
-                trends.impact_delta_monetization
-                if trends.impact_delta_monetization
-                else None
-            )
-            delta_color = "inverse" if delta_val and delta_val > 0 else "normal"
-
+            delta_val = getattr(trends, "impact_delta_monetization", None)
+            delta_color = "inverse" if delta_val and float(delta_val) > 0 else "normal"
+            risk = getattr(monetization, "risk_level", "low") or "low"
+            impact = float(getattr(monetization, "impact_score", 0) or 0)
+            rc = int(getattr(monetization, "review_count", 0) or 0)
             st.metric(
-                label=f"Monetization ({monetization.risk_level.upper()} RISK)",
-                value=f"{monetization.impact_score:,.0f}",
-                delta=f"{delta_val:+,.0f}" if delta_val else None,
+                label=f"Monetization ({risk.upper()} RISK)",
+                value=f"{impact:,.0f}",
+                delta=f"{float(delta_val):+,.0f}" if delta_val is not None else None,
                 delta_color=delta_color,
             )
-            st.caption(f"{monetization.review_count} reviews analyzed")
+            st.caption(f"{rc} reviews analyzed")
 
-    acquisition = next((a for a in business_areas if a.name == "acquisition"), None)
+    acquisition = next(
+        (a for a in business_areas if getattr(a, "name", "") == "acquisition"),
+        None,
+    )
     with col3:
         if acquisition:
-            delta_val = (
-                trends.impact_delta_acquisition
-                if trends.impact_delta_acquisition
-                else None
-            )
-            delta_color = "inverse" if delta_val and delta_val > 0 else "normal"
-
+            delta_val = getattr(trends, "impact_delta_acquisition", None)
+            delta_color = "inverse" if delta_val and float(delta_val) > 0 else "normal"
+            risk = getattr(acquisition, "risk_level", "low") or "low"
+            impact = float(getattr(acquisition, "impact_score", 0) or 0)
+            rc = int(getattr(acquisition, "review_count", 0) or 0)
             st.metric(
-                label=f"Acquisition ({acquisition.risk_level.upper()} RISK)",
-                value=f"{acquisition.impact_score:,.0f}",
-                delta=f"{delta_val:+,.0f}" if delta_val else None,
+                label=f"Acquisition ({risk.upper()} RISK)",
+                value=f"{impact:,.0f}",
+                delta=f"{float(delta_val):+,.0f}" if delta_val is not None else None,
                 delta_color=delta_color,
             )
-            st.caption(f"{acquisition.review_count} reviews analyzed")
+            st.caption(f"{rc} reviews analyzed")
 
 
 def render_business_area_chart(business_areas: list[BusinessArea]):
-    """Render interactive business area impact visualization with percentages."""
+    """Render interactive business area impact visualization using API data."""
     st.subheader("Business Area Impact Distribution")
 
     df = pd.DataFrame(
         [
             {
-                "Area": area.name.title(),
-                "Impact Score": max(0.0, float(area.impact_score)),
-                "Review Count": area.review_count,
-                "Risk Level": area.risk_level,
+                "Area": (getattr(area, "name", "") or "").title(),
+                "Impact Score": max(0.0, float(getattr(area, "impact_score", 0) or 0)),
+                "Review Count": int(getattr(area, "review_count", 0) or 0),
+                "Risk Level": getattr(area, "risk_level", "low") or "low",
             }
             for area in business_areas
         ]
@@ -542,14 +597,11 @@ def render_business_area_chart(business_areas: list[BusinessArea]):
 
 
 def render_trend_chart(trends: TrendData):
-    """Render trend comparison chart."""
-    if not any(
-        [
-            trends.impact_delta_retention,
-            trends.impact_delta_monetization,
-            trends.impact_delta_acquisition,
-        ]
-    ):
+    """Render trend comparison chart using API trend data."""
+    dr = getattr(trends, "impact_delta_retention", None)
+    dm = getattr(trends, "impact_delta_monetization", None)
+    da = getattr(trends, "impact_delta_acquisition", None)
+    if not any([dr is not None, dm is not None, da is not None]):
         st.info("Trend comparison requires multiple runs on the same dataset")
         return
 
@@ -558,20 +610,17 @@ def render_trend_chart(trends: TrendData):
     areas = []
     deltas = []
 
-    if trends.impact_delta_retention is not None:
+    if dr is not None:
         areas.append("Retention")
-        deltas.append(trends.impact_delta_retention)
-
-    if trends.impact_delta_monetization is not None:
+        deltas.append(float(dr))
+    if dm is not None:
         areas.append("Monetization")
-        deltas.append(trends.impact_delta_monetization)
-
-    if trends.impact_delta_acquisition is not None:
+        deltas.append(float(dm))
+    if da is not None:
         areas.append("Acquisition")
-        deltas.append(trends.impact_delta_acquisition)
+        deltas.append(float(da))
 
     df = pd.DataFrame({"Business Area": areas, "Impact Change": deltas})
-
     colors = ["#FF6B6B" if x > 0 else "#90EE90" for x in deltas]
 
     fig = go.Figure(
@@ -598,35 +647,41 @@ def render_trend_chart(trends: TrendData):
 
     st.plotly_chart(fig, use_container_width=True)
 
-    if trends.new_top_issue:
-        st.warning(f"New top issue category detected: **{trends.new_top_issue}**")
+    new_top = getattr(trends, "new_top_issue", None)
+    if new_top:
+        st.warning(f"New top issue category detected: **{new_top}**")
 
 
 def render_actionable_insights(top_issues: list[TopIssue]):
-    """Render actionable issue buckets using API-provided recommended_action and severity."""
+    """Render actionable issue buckets using API-provided priority_bucket and recommended_action."""
     st.subheader("Actionable Insights")
 
     rows = []
     for issue in top_issues:
-        priority_bucket = issue.priority_bucket or "Monitor"
-        recommended_action = issue.recommended_action or "Triage with product team for next steps"
-        example = (
-            issue.example_summary[:60] + "..."
-            if len(issue.example_summary) > 60
-            else issue.example_summary
+        priority_bucket = getattr(issue, "priority_bucket", None) or "Monitor"
+        recommended_action = (
+            getattr(issue, "recommended_action", None)
+            or "Triage with product team for next steps"
         )
+        example = getattr(issue, "example_summary", "") or ""
+        if len(example) > 60:
+            example = example[:60] + "..."
         rows.append(
             {
                 "Priority": priority_bucket,
-                "Category": issue.category,
-                "Urgency": issue.urgency,
-                "Count": issue.count,
-                "Impact": f"{issue.impact_score:,.0f}",
+                "Category": getattr(issue, "category", ""),
+                "Urgency": getattr(issue, "urgency", ""),
+                "Count": int(getattr(issue, "count", 0) or 0),
+                "Impact": f"{float(getattr(issue, 'impact_score', 0) or 0):,.0f}",
                 "Example": example,
                 "Recommended Action": recommended_action,
-                "_severity": issue.severity or "info",
+                "_severity": getattr(issue, "severity", None) or "info",
             }
         )
+
+    if not rows:
+        st.info("No actionable issues from this run")
+        return
 
     df = pd.DataFrame(rows)
 
@@ -646,7 +701,7 @@ def render_actionable_insights(top_issues: list[TopIssue]):
 
 def render_mini_compare(base_url: str, completed_runs: list[RunInfo]):
     """Render mini compare section in collapsible expander."""
-    with st.expander("📊 Compare Runs", expanded=False):
+    with st.expander("Compare Runs", expanded=False):
         if len(completed_runs) < 2:
             st.info(
                 "Comparison requires at least 2 completed runs. Run more analyses to enable comparison."
@@ -839,8 +894,10 @@ def render_charts_tab(base_url: str, run_id: str):
             return
 
         for chart in charts:
-            chart_name = chart["name"]
-            display_name = chart["display_name"]
+            chart_name = chart.get("name")
+            display_name = chart.get("display_name") or (chart_name or "Chart")
+            if not chart_name:
+                continue
 
             st.markdown(f"### {display_name}")
 
@@ -897,21 +954,18 @@ def render_top_urgent_tab(base_url: str, run_id: str, run_created_at: str):
             st.info("No urgent reviews found")
             return
 
-        st.dataframe(
-            df[
-                [
-                    "review_id",
-                    "category",
-                    "urgency",
-                    "priority_score",
-                    "rating",
-                    "thumbs_up",
-                    "summary",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        display_cols = [
+            "review_id",
+            "review_date",
+            "category",
+            "urgency",
+            "priority_score",
+            "rating",
+            "thumbs_up",
+            "summary",
+        ]
+        cols = [c for c in display_cols if c in df.columns]
+        st.dataframe(df[cols], use_container_width=True, hide_index=True)
 
         st.caption(
             f"Showing top {len(df)} reviews sorted by priority score (descending)"
@@ -979,22 +1033,19 @@ def render_results_tab(base_url: str, run_id: str, run_created_at: str):
             st.info("No results found with current filters")
             return
 
-        st.dataframe(
-            df[
-                [
-                    "review_id",
-                    "category",
-                    "urgency",
-                    "priority_score",
-                    "rating",
-                    "thumbs_up",
-                    "summary",
-                    "tags",
-                ]
-            ],
-            use_container_width=True,
-            hide_index=True,
-        )
+        display_cols = [
+            "review_id",
+            "review_date",
+            "category",
+            "urgency",
+            "priority_score",
+            "rating",
+            "thumbs_up",
+            "summary",
+            "tags",
+        ]
+        cols = [c for c in display_cols if c in df.columns]
+        st.dataframe(df[cols], use_container_width=True, hide_index=True)
 
         st.caption(f"Showing {len(df)} results (filtered)")
 
@@ -1009,7 +1060,7 @@ def render_results_tab(base_url: str, run_id: str, run_created_at: str):
 
 def main():
     st.set_page_config(
-        page_title="Product Health Control Panel", page_icon="📊", layout="wide"
+        page_title="Product Health Control Panel", layout="wide"
     )
 
     # Header: app name and version from API when available (set after summary load)
@@ -1074,22 +1125,23 @@ def main():
         with st.spinner("Loading analysis data..."):
             summary = fetch_summary(API_BASE_URL, selected_run_id)
 
-        # Header: app name and version from API (dataset metadata)
+        # Metadata header: app_name, app_version, platform from DatasetMetadataSummary
         meta = getattr(summary, "dataset_metadata", None)
         if meta and (meta.app_name or meta.app_version or meta.platform):
-            st.markdown("---")
-            parts = []
-            if meta.app_name:
-                parts.append(f"**App:** {meta.app_name}")
-            if meta.app_version:
-                parts.append(f"**Version:** {meta.app_version}")
-            if meta.platform:
-                parts.append(f"**Platform:** {meta.platform}")
-            st.markdown("  ·  ".join(parts))
-            st.markdown("---")
+            with st.container():
+                parts = []
+                if getattr(meta, "app_name", None):
+                    parts.append(f"App: {meta.app_name}")
+                if getattr(meta, "app_version", None):
+                    parts.append(f"Version: {meta.app_version}")
+                if getattr(meta, "platform", None):
+                    parts.append(f"Platform: {meta.platform}")
+                if parts:
+                    st.info(" | ".join(parts))
+            st.divider()
 
         tab1, tab2, tab3, tab4 = st.tabs(
-            ["📊 Overview", "📈 Charts", "🚨 Top Urgent", "📋 Results"]
+            ["Overview", "Charts", "Top Urgent", "Results"]
         )
 
         with tab1:
