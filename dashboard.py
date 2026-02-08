@@ -4,9 +4,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from typing import Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import os
-from io import BytesIO
 
 
 # ============================================================================
@@ -47,6 +46,9 @@ class TopIssue:
     impact_score: float
     count: int
     example_summary: str
+    recommended_action: Optional[str] = None
+    severity: Optional[str] = None
+    priority_bucket: Optional[str] = None
 
 
 @dataclass
@@ -67,6 +69,13 @@ class TrendData:
 
 
 @dataclass
+class DatasetMetadataSummary:
+    app_name: Optional[str] = None
+    app_version: Optional[str] = None
+    platform: Optional[str] = None
+
+
+@dataclass
 class RunSummary:
     run_id: str
     kpis: KPIMetrics
@@ -74,6 +83,7 @@ class RunSummary:
     top_issues: list[TopIssue]
     alerts: list[Alert]
     trends: TrendData
+    dataset_metadata: Optional[DatasetMetadataSummary] = None
 
 
 @dataclass
@@ -168,9 +178,31 @@ class ApiClient:
         )
 
         business_areas = [BusinessArea(**area) for area in data["business_areas"]]
-        top_issues = [TopIssue(**issue) for issue in data["top_issues"]]
+        top_issues = [
+            TopIssue(
+                category=issue["category"],
+                urgency=issue["urgency"],
+                impact_score=issue["impact_score"],
+                count=issue["count"],
+                example_summary=issue["example_summary"],
+                recommended_action=issue.get("recommended_action"),
+                severity=issue.get("severity"),
+                priority_bucket=issue.get("priority_bucket"),
+            )
+            for issue in data["top_issues"]
+        ]
         alerts = [Alert(**alert) for alert in data["alerts"]]
         trends = TrendData(**data["trends"])
+        dm = data.get("dataset_metadata")
+        dataset_metadata = (
+            DatasetMetadataSummary(
+                app_name=dm.get("app_name"),
+                app_version=dm.get("app_version"),
+                platform=dm.get("platform"),
+            )
+            if dm
+            else None
+        )
 
         return RunSummary(
             run_id=data["run_id"],
@@ -179,6 +211,7 @@ class ApiClient:
             top_issues=top_issues,
             alerts=alerts,
             trends=trends,
+            dataset_metadata=dataset_metadata,
         )
 
     def get_results(
@@ -293,103 +326,7 @@ def fetch_chart_png(base_url: str, run_id: str, chart_name: str) -> bytes:
 
 
 # ============================================================================
-# BUSINESS LOGIC
-# ============================================================================
-
-
-def classify_action_priority(impact_score: float) -> tuple[str, str]:
-    """Classify issue into action bucket based on impact."""
-    if impact_score > 150:
-        return "Fix Immediately", "critical"
-    elif impact_score >= 80:
-        return "Investigate", "warning"
-    else:
-        return "Monitor", "info"
-
-
-def generate_recommendation(category: str, urgency: str, example_summary: str) -> str:
-    """Generate rule-based recommendation for issue."""
-    summary_lower = example_summary.lower()
-
-    # Praise handling
-    if category == "praise":
-        return "Celebrate this feedback and amplify positive features in marketing"
-
-    # Keyword-based recommendations
-    if (
-        "crash" in summary_lower
-        or "freeze" in summary_lower
-        or "close" in summary_lower
-    ):
-        return "Investigate crash logs and error tracking system immediately"
-
-    if (
-        "login" in summary_lower
-        or "authentication" in summary_lower
-        or "sign in" in summary_lower
-    ):
-        return "Audit authentication flow and session management"
-
-    if "payment" in summary_lower and (
-        "fail" in summary_lower
-        or "error" in summary_lower
-        or "not work" in summary_lower
-    ):
-        return "Audit payment provider integration and error handling"
-
-    if (
-        "refund" in summary_lower
-        or "chargeback" in summary_lower
-        or "money back" in summary_lower
-    ):
-        return "Review refund policy and payment dispute handling"
-
-    if "ad" in summary_lower and (
-        "spam" in summary_lower
-        or "too many" in summary_lower
-        or "annoying" in summary_lower
-    ):
-        return "Review ad frequency capping and user experience"
-
-    if (
-        "lag" in summary_lower
-        or "slow" in summary_lower
-        or "performance" in summary_lower
-        or "loading" in summary_lower
-    ):
-        return "Profile application performance and optimize bottlenecks"
-
-    if (
-        "battery" in summary_lower
-        or "drain" in summary_lower
-        or "heat" in summary_lower
-    ):
-        return "Investigate resource usage and optimize battery consumption"
-
-    if (
-        "tutorial" in summary_lower
-        or "onboarding" in summary_lower
-        or "confusing" in summary_lower
-    ):
-        return "Review onboarding flow and improve user guidance"
-
-    # Category-based fallbacks
-    if category == "bug":
-        return "Reproduce issue and assign to engineering team"
-    elif category == "payment":
-        return "Escalate to payment operations and finance team"
-    elif category == "feature_request":
-        return "Add to product backlog for prioritization"
-    elif category == "performance":
-        return "Conduct performance profiling and optimization review"
-    elif category == "complaint":
-        return "Investigate root cause and escalate to product team"
-    else:
-        return "Triage with product team for next steps"
-
-
-# ============================================================================
-# UI COMPONENTS
+# UI COMPONENTS (data-driven: render API data only, no business logic)
 # ============================================================================
 
 
@@ -573,13 +510,17 @@ def render_business_area_chart(business_areas: list[BusinessArea]):
         [
             {
                 "Area": area.name.title(),
-                "Impact Score": area.impact_score,
+                "Impact Score": max(0.0, float(area.impact_score)),
                 "Review Count": area.review_count,
                 "Risk Level": area.risk_level,
             }
             for area in business_areas
         ]
     )
+
+    if df.empty or df["Impact Score"].sum() == 0:
+        st.info("No business area impact data to display")
+        return
 
     color_map = {"low": "#90EE90", "medium": "#FFA500", "high": "#FF6B6B"}
 
@@ -592,7 +533,6 @@ def render_business_area_chart(business_areas: list[BusinessArea]):
         hover_data=["Review Count", "Impact Score"],
         title="",
     )
-
     fig.update_traces(textinfo="label+percent root")
     fig.update_layout(height=400)
 
@@ -661,28 +601,28 @@ def render_trend_chart(trends: TrendData):
 
 
 def render_actionable_insights(top_issues: list[TopIssue]):
-    """Render actionable issue buckets with recommendations."""
+    """Render actionable issue buckets using API-provided recommended_action and severity."""
     st.subheader("Actionable Insights")
 
     rows = []
     for issue in top_issues:
-        action_bucket, priority_level = classify_action_priority(issue.impact_score)
-        recommendation = generate_recommendation(
-            issue.category, issue.urgency, issue.example_summary
+        priority_bucket = issue.priority_bucket or "Monitor"
+        recommended_action = issue.recommended_action or "Triage with product team for next steps"
+        example = (
+            issue.example_summary[:60] + "..."
+            if len(issue.example_summary) > 60
+            else issue.example_summary
         )
-
         rows.append(
             {
-                "Priority": action_bucket,
+                "Priority": priority_bucket,
                 "Category": issue.category,
                 "Urgency": issue.urgency,
                 "Count": issue.count,
                 "Impact": f"{issue.impact_score:,.0f}",
-                "Example": issue.example_summary[:60] + "..."
-                if len(issue.example_summary) > 60
-                else issue.example_summary,
-                "Recommended Action": recommendation,
-                "_priority_level": priority_level,
+                "Example": example,
+                "Recommended Action": recommended_action,
+                "_severity": issue.severity or "info",
             }
         )
 
@@ -690,17 +630,16 @@ def render_actionable_insights(top_issues: list[TopIssue]):
 
     for bucket in ["Fix Immediately", "Investigate", "Monitor"]:
         bucket_df = df[df["Priority"] == bucket]
-
-        if len(bucket_df) > 0:
-            if bucket == "Fix Immediately":
-                st.error(f"**{bucket}** ({len(bucket_df)} issues)")
-            elif bucket == "Investigate":
-                st.warning(f"**{bucket}** ({len(bucket_df)} issues)")
-            else:
-                st.info(f"**{bucket}** ({len(bucket_df)} issues)")
-
-            display_df = bucket_df.drop(columns=["Priority", "_priority_level"])
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        if len(bucket_df) == 0:
+            continue
+        if bucket == "Fix Immediately":
+            st.error(f"**{bucket}** ({len(bucket_df)} issues)")
+        elif bucket == "Investigate":
+            st.warning(f"**{bucket}** ({len(bucket_df)} issues)")
+        else:
+            st.info(f"**{bucket}** ({len(bucket_df)} issues)")
+        display_df = bucket_df.drop(columns=["Priority", "_severity"])
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
 
 def render_mini_compare(base_url: str, completed_runs: list[RunInfo]):
@@ -829,7 +768,7 @@ def render_mini_compare(base_url: str, completed_runs: list[RunInfo]):
             )
 
             fig.update_layout(
-                title=f"Run B vs Run A: Business Area Impact Change",
+                title="Run B vs Run A: Business Area Impact Change",
                 yaxis_title="Impact Score Delta",
                 xaxis_title="Business Area",
                 height=350,
@@ -1071,6 +1010,7 @@ def main():
         page_title="Product Health Control Panel", page_icon="📊", layout="wide"
     )
 
+    # Header: app name and version from API when available (set after summary load)
     st.title("Product Health & Revenue Risk Control Panel")
     st.markdown("Executive decision support for mobile game operations")
 
@@ -1131,6 +1071,20 @@ def main():
     try:
         with st.spinner("Loading analysis data..."):
             summary = fetch_summary(API_BASE_URL, selected_run_id)
+
+        # Header: app name and version from API (dataset metadata)
+        meta = getattr(summary, "dataset_metadata", None)
+        if meta and (meta.app_name or meta.app_version or meta.platform):
+            st.markdown("---")
+            parts = []
+            if meta.app_name:
+                parts.append(f"**App:** {meta.app_name}")
+            if meta.app_version:
+                parts.append(f"**Version:** {meta.app_version}")
+            if meta.platform:
+                parts.append(f"**Platform:** {meta.platform}")
+            st.markdown("  ·  ".join(parts))
+            st.markdown("---")
 
         tab1, tab2, tab3, tab4 = st.tabs(
             ["📊 Overview", "📈 Charts", "🚨 Top Urgent", "📋 Results"]

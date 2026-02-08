@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
+from typing import Optional
+
 from api.schemas.datasets import (
     DatasetUploadResponse,
     DatasetListResponse,
@@ -23,19 +25,29 @@ def get_dataset_service(
 
 @router.post("", response_model=DatasetUploadResponse, status_code=201)
 async def upload_dataset(
-    file: UploadFile = File(...), service: DatasetService = Depends(get_dataset_service)
+    file: UploadFile = File(...),
+    app_name: Optional[str] = Form(None),
+    app_version: Optional[str] = Form(None),
+    platform: Optional[str] = Form(None),
+    service: DatasetService = Depends(get_dataset_service),
 ):
     """
-    Upload a new dataset CSV.
+    Upload a new dataset CSV with optional metadata.
 
     File will be cleaned using existing pipeline logic.
-    Returns dataset metadata including row counts.
+    Optional form fields: app_name, app_version, platform (for dashboard header).
     """
     if not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are supported")
 
     content = await file.read()
-    dataset = service.create_dataset(file.filename, content)
+    dataset = service.create_dataset(
+        file.filename,
+        content,
+        app_name=app_name,
+        app_version=app_version,
+        platform=platform,
+    )
 
     return DatasetUploadResponse(
         dataset_id=dataset.dataset_id,
@@ -43,6 +55,9 @@ async def upload_dataset(
         rows_raw=dataset.rows_raw,
         rows_clean=dataset.rows_clean,
         created_at=dataset.created_at,
+        app_name=dataset.app_name,
+        app_version=dataset.app_version,
+        platform=dataset.platform,
     )
 
 
@@ -58,6 +73,9 @@ def list_datasets(service: DatasetService = Depends(get_dataset_service)):
                 rows_raw=d.rows_raw,
                 rows_clean=d.rows_clean,
                 created_at=d.created_at,
+                app_name=getattr(d, "app_name", None),
+                app_version=getattr(d, "app_version", None),
+                platform=getattr(d, "platform", None),
             )
             for d in datasets
         ],
@@ -88,6 +106,9 @@ def get_dataset(
         rows_raw=dataset.rows_raw,
         rows_clean=dataset.rows_clean,
         created_at=dataset.created_at,
+        app_name=getattr(dataset, "app_name", None),
+        app_version=getattr(dataset, "app_version", None),
+        platform=getattr(dataset, "platform", None),
         preview=preview,
     )
 

@@ -15,7 +15,7 @@ class RunStatus(str, Enum):
 
 @dataclass
 class Dataset:
-    """Dataset metadata."""
+    """Dataset metadata with optional app context for reporting."""
 
     dataset_id: str
     filename: str
@@ -23,6 +23,9 @@ class Dataset:
     rows_clean: int
     created_at: datetime
     file_path: str
+    app_name: Optional[str] = None
+    app_version: Optional[str] = None
+    platform: Optional[str] = None
 
 
 @dataclass

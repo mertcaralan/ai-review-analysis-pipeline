@@ -14,7 +14,7 @@ class ResultsFilterParams(BaseModel):
 
 
 class ReviewResult(BaseModel):
-    """Single review analysis result."""
+    """Single review analysis result. Includes original review_date when available."""
 
     review_id: str
     category: str
@@ -24,6 +24,10 @@ class ReviewResult(BaseModel):
     rating: int
     thumbs_up: int
     priority_score: float
+    review_date: Optional[str] = Field(
+        None,
+        description="Original review date/timestamp from source when available",
+    )
 
 
 class ResultsResponse(BaseModel):

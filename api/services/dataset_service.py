@@ -18,30 +18,31 @@ class DatasetService:
         self.datasets_dir = datasets_dir
         self.storage_service = StorageService()
 
-    def create_dataset(self, filename: str, file_content: bytes) -> Dataset:
+    def create_dataset(
+        self,
+        filename: str,
+        file_content: bytes,
+        app_name: Optional[str] = None,
+        app_version: Optional[str] = None,
+        platform: Optional[str] = None,
+    ) -> Dataset:
         """
-        Upload, clean, and store dataset.
+        Upload, clean, and store dataset with optional metadata.
 
         Reuses existing app/load_reviews.py for cleaning logic.
         """
         dataset_id = str(uuid.uuid4())
         file_path = self.datasets_dir / f"{dataset_id}.csv"
 
-        # Save uploaded file
         self.storage_service.save_uploaded_file(file_content, file_path)
 
-        # Count raw rows
         df_raw = pd.read_csv(file_path)
         rows_raw = len(df_raw)
 
-        # Clean using existing pipeline logic
         df_clean = load_and_clean_reviews(str(file_path))
         rows_clean = len(df_clean)
-
-        # Overwrite with cleaned version
         df_clean.to_csv(file_path, index=False)
 
-        # Create metadata
         dataset = Dataset(
             dataset_id=dataset_id,
             filename=filename,
@@ -49,6 +50,9 @@ class DatasetService:
             rows_clean=rows_clean,
             created_at=datetime.now(),
             file_path=str(file_path),
+            app_name=app_name,
+            app_version=app_version,
+            platform=platform,
         )
 
         self.store.save_dataset(dataset)
