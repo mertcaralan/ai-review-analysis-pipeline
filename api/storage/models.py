@@ -1,11 +1,17 @@
+"""
+Domain models for API storage layer.
+
+These are mutable runtime entities (not Pydantic request/response schemas).
+"""
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 
 class RunStatus(str, Enum):
-    """Run execution status."""
+    """Lifecycle status of an analysis run."""
 
     QUEUED = "queued"
     RUNNING = "running"
@@ -15,7 +21,7 @@ class RunStatus(str, Enum):
 
 @dataclass
 class Dataset:
-    """Dataset metadata with optional app context for reporting."""
+    """Uploaded dataset metadata and location."""
 
     dataset_id: str
     filename: str
@@ -36,10 +42,10 @@ class Run:
     dataset_id: str
     status: RunStatus
     created_at: datetime
+    config: dict[str, Any]
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    total_reviews: int = 0
-    processed_reviews: int = 0
+    total_reviews: Optional[int] = None
+    processed_reviews: Optional[int] = None
     error_message: Optional[str] = None
-    config: dict = field(default_factory=dict)
     logs: list[str] = field(default_factory=list)

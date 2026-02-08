@@ -158,7 +158,7 @@ class ApiClient:
         response.raise_for_status()
 
         data = response.json()
-        kpis_data = data["kpis"]
+        kpis_data = data.get("kpis") or {}
 
         # Safe field extraction with defaults for backward compatibility
         kpis = KPIMetrics(
@@ -177,7 +177,9 @@ class ApiClient:
             praise_ratio=kpis_data.get("praise_ratio", 0.0),
         )
 
-        business_areas = [BusinessArea(**area) for area in data["business_areas"]]
+        business_areas = [
+            BusinessArea(**area) for area in data.get("business_areas") or []
+        ]
         top_issues = [
             TopIssue(
                 category=issue["category"],
@@ -189,10 +191,10 @@ class ApiClient:
                 severity=issue.get("severity"),
                 priority_bucket=issue.get("priority_bucket"),
             )
-            for issue in data["top_issues"]
+            for issue in data.get("top_issues") or []
         ]
-        alerts = [Alert(**alert) for alert in data["alerts"]]
-        trends = TrendData(**data["trends"])
+        alerts = [Alert(**alert) for alert in data.get("alerts") or []]
+        trends = TrendData(**(data.get("trends") or {}))
         dm = data.get("dataset_metadata")
         dataset_metadata = (
             DatasetMetadataSummary(
@@ -205,7 +207,7 @@ class ApiClient:
         )
 
         return RunSummary(
-            run_id=data["run_id"],
+            run_id=data.get("run_id", ""),
             kpis=kpis,
             business_areas=business_areas,
             top_issues=top_issues,

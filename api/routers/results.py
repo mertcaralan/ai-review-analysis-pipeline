@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 from typing import Optional
-import ast
 
 from api.schemas.results import (
     ResultsResponse,
@@ -10,38 +9,10 @@ from api.schemas.results import (
     ChartInfo,
 )
 from api.services.run_service import RunService
-from api.config import Settings
-from api.deps import get_config, get_run_service
+from api.deps import get_run_service
 from api.storage.models import RunStatus
 
 router = APIRouter(prefix="/runs", tags=["Results"])
-
-
-def _parse_tags(tags_value) -> list[str]:
-    """
-    Safely parse tags column from CSV.
-
-    CSV stores lists as strings: "['tag1', 'tag2']"
-    This converts them back to Python lists.
-    """
-    if not tags_value or tags_value == "" or tags_value == "[]":
-        return []
-
-    if isinstance(tags_value, list):
-        return tags_value
-
-    if isinstance(tags_value, str):
-        try:
-            # Handle string representation of list
-            parsed = ast.literal_eval(tags_value)
-            if isinstance(parsed, list):
-                return parsed
-            return []
-        except (ValueError, SyntaxError):
-            # If parsing fails, treat as comma-separated string
-            return [tag.strip() for tag in tags_value.split(",") if tag.strip()]
-
-    return []
 
 
 @router.get("/{run_id}/results", response_model=ResultsResponse)
@@ -84,14 +55,12 @@ def get_results(
         sort=sort,
     )
 
-    # Parse tags column for each result (CSV stores as string)
-    parsed_results = []
-    for result in results:
-        result["tags"] = _parse_tags(result.get("tags", []))
-        parsed_results.append(ReviewResult(**result))
-
     return ResultsResponse(
-        run_id=run_id, results=parsed_results, total=total, limit=limit, offset=offset
+        run_id=run_id,
+        results=[ReviewResult(**r) for r in results],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 
@@ -117,20 +86,12 @@ def get_top_urgent(
         )
 
     results = service.get_top_urgent(run_id, limit)
-
-    # Parse tags column
-    parsed_results = []
-    for result in results:
-        result["tags"] = _parse_tags(result.get("tags", []))
-        parsed_results.append(result)
-
-    return {"run_id": run_id, "results": parsed_results, "limit": limit}
+    return {"run_id": run_id, "results": results, "limit": limit}
 
 
 @router.get("/{run_id}/exports/results.csv")
 def export_results_csv(
     run_id: str,
-    config: Settings = Depends(get_config),
     service: RunService = Depends(get_run_service),
 ):
     """
@@ -142,21 +103,22 @@ def export_results_csv(
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    file_path = config.RUNS_DIR / run_id / "results.csv"
+    file_path = service.get_results_path(run_id)
     if not file_path.exists():
         raise HTTPException(
             404, "Results file not found. Run may not be completed yet."
         )
 
     return FileResponse(
-        path=file_path, media_type="text/csv", filename=f"results_{run_id}.csv"
+        path=str(file_path),
+        media_type="text/csv",
+        filename=f"results_{run_id}.csv",
     )
 
 
 @router.get("/{run_id}/exports/top_urgent.csv")
 def export_top_urgent_csv(
     run_id: str,
-    config: Settings = Depends(get_config),
     service: RunService = Depends(get_run_service),
 ):
     """
@@ -168,14 +130,16 @@ def export_top_urgent_csv(
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    file_path = config.RUNS_DIR / run_id / "top_urgent.csv"
+    file_path = service.get_top_urgent_path(run_id)
     if not file_path.exists():
         raise HTTPException(
             404, "Top urgent file not found. Run may not be completed yet."
         )
 
     return FileResponse(
-        path=file_path, media_type="text/csv", filename=f"top_urgent_{run_id}.csv"
+        path=str(file_path),
+        media_type="text/csv",
+        filename=f"top_urgent_{run_id}.csv",
     )
 
 
@@ -210,7 +174,6 @@ def list_charts(run_id: str, service: RunService = Depends(get_run_service)):
 def get_chart(
     run_id: str,
     chart_name: str,
-    config: Settings = Depends(get_config),
     service: RunService = Depends(get_run_service),
 ):
     """
@@ -229,8 +192,8 @@ def get_chart(
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    chart_path = config.RUNS_DIR / run_id / "charts" / chart_name
+    chart_path = service.get_chart_path(run_id, chart_name)
     if not chart_path.exists():
         raise HTTPException(404, f"Chart '{chart_name}' not found")
 
-    return FileResponse(path=chart_path, media_type="image/png")
+    return FileResponse(path=str(chart_path), media_type="image/png")

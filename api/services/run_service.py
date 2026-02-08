@@ -1,13 +1,35 @@
+import ast
+import asyncio
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any, Tuple
+from typing import Any, List, Dict, Optional, Tuple
 import traceback
 
 from api.storage.models import Run, RunStatus
 from api.storage.in_memory import InMemoryStore
 from api.services.dataset_service import DatasetService
 from api.services.pipeline_service import PipelineService
+
+
+def _parse_tags(tags_value: Any) -> list[str]:
+    """
+    Parse tags column from CSV (stored as string representation of list).
+    Keeps domain logic in the service layer; routers receive ready-to-use data.
+    """
+    if not tags_value or tags_value == "" or tags_value == "[]":
+        return []
+    if isinstance(tags_value, list):
+        return list(tags_value)
+    if isinstance(tags_value, str):
+        try:
+            parsed = ast.literal_eval(tags_value)
+            if isinstance(parsed, list):
+                return parsed
+            return []
+        except (ValueError, SyntaxError):
+            return [t.strip() for t in tags_value.split(",") if t.strip()]
+    return []
 
 
 class RunService:
@@ -22,11 +44,31 @@ class RunService:
         self.pipeline_service = PipelineService()
 
     def list_runs(self) -> List[Run]:
-        """
-        Sistemdeki tüm analizleri listeler.
-        Dashboard'un dropdown menüsünü doldurması için kritik öneme sahiptir.
-        """
+        """List all analysis runs (used by dashboard dropdown)."""
         return self.store.list_runs()
+
+    @staticmethod
+    def run_to_response_payload(r: Run) -> Dict[str, Any]:
+        """
+        Build response payload for a run (DRY: progress and status in one place).
+        Used by runs router to avoid duplicated logic and division-by-zero handling.
+        """
+        total = r.total_reviews or 0
+        processed = r.processed_reviews or 0
+        progress = (processed / total * 100) if total > 0 else 0.0
+        status_str = r.status.value if hasattr(r.status, "value") else str(r.status)
+        return {
+            "run_id": r.run_id,
+            "dataset_id": r.dataset_id,
+            "status": status_str,
+            "created_at": r.created_at,
+            "started_at": r.started_at,
+            "completed_at": r.completed_at,
+            "total_reviews": total,
+            "processed_reviews": processed,
+            "progress_percent": progress,
+            "error_message": r.error_message,
+        }
 
     def create_run(
         self,
@@ -54,6 +96,22 @@ class RunService:
     def get_run(self, run_id: str) -> Optional[Run]:
         """Get run by ID."""
         return self.store.get_run(run_id)
+
+    def get_run_dir(self, run_id: str) -> Path:
+        """Return run output directory (for exports and charts)."""
+        return self.runs_dir / run_id
+
+    def get_results_path(self, run_id: str) -> Path:
+        """Return path to run results CSV."""
+        return self.get_run_dir(run_id) / "results.csv"
+
+    def get_chart_path(self, run_id: str, chart_name: str) -> Path:
+        """Return path to a chart PNG."""
+        return self.get_run_dir(run_id) / "charts" / chart_name
+
+    def get_top_urgent_path(self, run_id: str) -> Path:
+        """Return path to top_urgent CSV."""
+        return self.get_run_dir(run_id) / "top_urgent.csv"
 
     async def execute_run(self, run_id: str):
         """
@@ -88,8 +146,9 @@ class RunService:
                 run.logs.append(f"[{datetime.now()}] {msg}")
                 self.store.save_run(run)
 
-            # Execute pipeline with metadata so CSV/LLM stay aligned with upload context
-            summary = self.pipeline_service.run_analysis(
+            # Run sync pipeline in thread pool to avoid blocking the event loop
+            summary = await asyncio.to_thread(
+                self.pipeline_service.run_analysis,
                 input_csv=input_csv,
                 output_dir=output_dir,
                 max_reviews=run.config.get("max_reviews"),
@@ -153,7 +212,10 @@ class RunService:
         # Paginate
         df = df.iloc[offset : offset + limit]
 
-        return df.to_dict(orient="records"), total
+        records = df.to_dict(orient="records")
+        for r in records:
+            r["tags"] = _parse_tags(r.get("tags", []))
+        return records, total
 
     def get_top_urgent(self, run_id: str, limit: int = 10) -> List[Dict[str, Any]]:
         """Get top N reviews by priority score."""
@@ -168,7 +230,10 @@ class RunService:
         if "priority_score" in df.columns:
             df = df.nlargest(limit, "priority_score")
 
-        return df.to_dict(orient="records")
+        records = df.to_dict(orient="records")
+        for r in records:
+            r["tags"] = _parse_tags(r.get("tags", []))
+        return records
 
     def list_charts(self, run_id: str) -> List[Dict[str, Any]]:
         """List all available charts for a run."""
