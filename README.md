@@ -1,39 +1,218 @@
-# Review Analyzer – Phase 3
+# AI Review Analysis Pipeline
 
-End-to-end pipeline that processes app store reviews, produces structured analysis results, and generates prioritization artifacts to support product and QA decision-making.
+## Executive Summary
 
-Status: Phase 3 completed. FastAPI service layer implemented as an MVP.
+This system addresses the challenge of turning unstructured app store reviews into actionable product intelligence. Mobile operators and product teams receive high volumes of user feedback across multiple sources. Manually reviewing and prioritizing this feedback is time-consuming and inconsistent.
 
----
-
-## Overview
-
-This project processes raw app store reviews in CSV format through a structured analysis pipeline.
-
-It supports two execution modes:
-
-* CLI mode for local batch processing
-* API mode via FastAPI for dataset management, run execution, and result retrieval
-
-The pipeline is designed to be deterministic, auditable, and easily extensible toward production-grade integrations.
+The pipeline ingests raw review data, applies AI-powered classification and summarization, and surfaces executive-level KPIs, risk signals, and recommended actions. The strategic value lies in reducing time to insight, standardizing prioritization across teams, and enabling data-driven product and QA decisions.
 
 ---
 
-## Pipeline Flow
+## Core Capabilities
 
-1. Load and clean raw reviews
-2. Build minimal payloads per review
-3. Run batch LLM analysis
-4. Save structured results
-5. Apply priority scoring
-6. Export top urgent reviews
-7. Generate visual summaries
+### Ingestion and Preparation
 
-The same core pipeline logic is reused in both CLI and API execution paths.
+- CSV dataset upload with optional metadata (app name, version, platform)
+- Standalone Google Play scraper producing pipeline-compatible CSV with review_id, review_text, rating, thumbs_up, review_timestamp, app_version, language, country
+- Automatic cleaning: deduplication by review_text, null handling for review_text, schema validation
+- Support for review_timestamp and review_date columns; values preserved through the full pipeline
+
+### AI Analysis
+
+- LLM-based classification into standardized categories: bug, payment, ads, performance, feature_request, praise, complaint, other
+- Urgency assessment (low, medium, high) with explicit rules: high for app unusable/crashes/payment failures; medium for major annoyance; low for minor issues
+- Rating and thumbs-up override rules: rating 2 with thumbs_up 10 or more raises urgency to at least medium; rating 2 with thumbs_up 50 or more raises to high
+- One-sentence summaries and topic tags (lowercase, underscore-separated, at most 5) per review
+- Context-aware prompts: app name passed to the model for product-specific advice
+
+### Priority Engine
+
+- Formula: priority_score = urgency_weight + rating_penalty + thumbs_bonus
+- Urgency weights: high=100, medium=50, low=10
+- Rating penalty: (5 - rating) * 10
+- Thumbs bonus: min(thumbs_up, 50)
+- Defensive handling: rating default 3, thumbs_up default 0 when missing or non-numeric
+
+### Business Intelligence Layer
+
+**Impact Health Classification**
+
+- Based on issue_impact_per_review (average priority score excluding praise)
+- Healthy: below 40
+- Watch: 40 to below 80
+- Risk: 80 or above
+
+**Action Priority Buckets**
+
+- Fix Immediately (critical): impact_score greater than 150
+- Investigate (warning): impact_score 80 to 150
+- Monitor (info): impact_score below 80
+
+**Business Area Mapping**
+
+- Retention: bug, performance, crash
+- Monetization: payment, ads
+- Acquisition: feature_request, ui_ux
+- Complaint reassignment: content-based mapping to retention (crash, freeze, login), monetization (payment, refund), or acquisition (onboarding, tutorial)
+
+**Risk Level Calculation**
+
+- Per business area, based on high-urgency ratio
+- High: high_urgency_ratio at least 0.40, minimum 5 reviews
+- Medium: high_urgency_ratio at least 0.20
+- Low: otherwise
+
+**Alert Thresholds**
+
+- High urgency ratio: alert when above 0.30
+- Fraud ratio: alert when above 0.10
+- Critical issues: high urgency and priority_score at least 120, excluding praise
+
+**Fraud Detection Heuristics**
+
+- Payment category, rating 2 or lower, and keywords (scam, fraud, cheat, steal, unauthorized, refund, chargeback)
+- Or duplicate summaries: same summary appearing 3 or more times
+
+**Rule-Based Recommendations**
+
+- Server-side generation per issue type: crash/investigate logs, payment/audit provider, performance/profile bottlenecks, praise/celebrate and amplify
+- Fallback: triage with product team for next steps
+
+### Visualization Suite
+
+- Review volume by category (bar chart)
+- Urgency distribution (bar chart, ordered high/medium/low)
+- Priority-weighted category impact (total priority score per category)
+- Urgency by category heatmap (cross-tabulation)
+- Top 10 urgent issues table (shareable PNG for escalation)
+
+### Dual Execution Modes
+
+- CLI mode: batch processing from data/input/reviews.csv to data/output/
+- API mode: dataset upload, run creation, result retrieval, chart and CSV export
+
+---
+
+## Architecture
+
+### Decoupled Backend-Frontend (Thin Client)
+
+The system follows a thin-client architecture. The Streamlit dashboard performs no business logic. It issues REST requests and renders the responses. All computation, validation, and orchestration live in the FastAPI backend.
+
+| Layer | Role |
+|-------|------|
+| Dashboard (Streamlit) | Run selection, API calls, visualization of precomputed data |
+| FastAPI API | Routing, dependency injection, request/response shaping |
+| Services | Dataset management, run lifecycle, pipeline orchestration, summary generation |
+| app/ modules | Core pipeline: load, analyze, LLM batch, priority scoring, visualization |
+
+The same app/ pipeline modules power both the CLI and the API. The PipelineService wraps these modules and provides run-scoped outputs.
+
+### Asynchronous Processing
+
+Analysis runs execute asynchronously via FastAPI BackgroundTasks. Clients receive an immediate run_id and poll /runs/{run_id} for status and progress. Logs are captured and available via /runs/{run_id}/logs. This design avoids blocking the API during long-running LLM batch execution.
+
+### Data Pipelines
+
+**Ingestion Paths**
+
+1. Scraper: `scraper.py` fetches Google Play reviews via google-play-scraper, outputs CSV with required columns and optional metadata
+2. API upload: POST /datasets with multipart file and optional form fields app_name, app_version, platform
+3. CLI: local file at data/input/reviews.csv
+
+**Upload Pipeline**
+
+```
+CSV file + metadata (app_name, app_version, platform)
+  -> DatasetService.create_dataset
+  -> load_and_clean_reviews (dedupe, drop nulls on review_text)
+  -> Cleaned CSV saved to storage/datasets/{dataset_id}.csv
+  -> Dataset metadata stored (in-memory)
+```
+
+**Analysis Pipeline**
+
+```
+POST /runs { dataset_id, max_reviews, model }
+  -> RunService.create_run
+  -> Background task: execute_run
+  -> PipelineService.run_analysis
+    -> run_metadata.json written with app_name, app_version, platform
+    -> build_review_payloads (preserves review_date, review_timestamp)
+    -> run_llm_batch (app_name passed for context)
+    -> add_priority_score (merge rating/thumbs_up from payloads)
+    -> save_top_urgent, create_charts
+  -> results.csv, top_urgent.csv, charts/ under storage/runs/{run_id}/
+```
+
+**Summary Pipeline**
+
+```
+GET /runs/{run_id}/summary
+  -> SummaryService.generate_summary
+  -> Read results.csv
+  -> Compute KPIs, business areas, top issues, alerts, trends vs previous run
+  -> Attach dataset_metadata (app_name, app_version, platform)
+  -> Return RunSummary (fully processed; no client-side logic)
+```
+
+---
+
+## Data Integrity
+
+**Metadata Flow**
+
+- Upload metadata is stored with the dataset and passed to the pipeline on run creation
+- run_metadata.json is written alongside each run's results for traceability
+- Executive summary includes dataset metadata for header display
+
+**Date Preservation**
+
+- Columns review_timestamp or review_date are detected and carried through payloads
+- LLM output is merged with payload data; dates are preserved in results
+- Run created_at, started_at, completed_at recorded for status and trend comparison
+
+**Validation and Robustness**
+
+- LLM responses validated against Pydantic ReviewAnalysis schema; invalid outputs fall back to category=other, urgency=medium, summary="Analysis failed"
+- Rating and thumbs_up normalized with defensive defaults when missing or non-numeric
+- Pipeline continues when individual reviews fail
+- Tags stored as string representations in CSV; parsed back to lists at API read time
+
+**Traceability**
+
+- Each run is tied to a dataset_id and has a unique run_id
+- Logs capture pipeline stages and errors with timestamps
+- Files under storage/runs/{run_id}/ form a complete audit trail
+
+---
+
+## Current State and Storage
+
+Dataset and run metadata are stored in memory. Process restart clears the in-memory store. File artifacts (CSV under storage/datasets/, run outputs under storage/runs/{run_id}/) persist on disk. After restart, previously created files may remain without corresponding metadata, a condition that would require reconciliation or manual cleanup in production.
+
+---
+
+## Future Roadmap
+
+1. **Persistent Metadata Store** – Replace InMemoryStore with a database to retain datasets and runs across restarts and enable querying by date, status, or dataset.
+
+2. **Scheduled Execution** – Cron or queue-based triggers for periodic health checks and trend tracking.
+
+3. **Notification and Reporting** – Slack or email integration for alert delivery when thresholds are breached or runs complete.
+
+4. **Authentication and Authorization** – User identity and role-based access for multi-tenant use.
+
+5. **External System Integration** – Automated ingestion from app store APIs or review aggregation services.
 
 ---
 
 ## Quick Start
+
+### Prerequisites
+
+- Python 3.10+
+- OpenAI API key
 
 ### Setup
 
@@ -52,19 +231,21 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Environment Variables
+### Environment
 
 ```bash
 cp .env.example .env
 ```
 
-Set the following variable:
+Set OPENAI_API_KEY in .env. Optional: OPENAI_MODEL, OPENAI_TEMPERATURE, OPENAI_MAX_TOKENS.
 
-```env
-OPENAI_API_KEY=sk-your-api-key-here
+### Scraper (Optional)
+
+```bash
+python scraper.py
 ```
 
-## Running the Pipeline
+Configure APP_ID, REVIEW_COUNT, OUTPUT_FILE, LANGUAGE, COUNTRY in the script. Output is pipeline-compatible CSV.
 
 ### CLI Mode
 
@@ -72,107 +253,55 @@ OPENAI_API_KEY=sk-your-api-key-here
 python main.py
 ```
 
-CLI execution writes outputs under:
+Uses data/input/reviews.csv. Outputs under data/output/.
 
-```
-data/output/
-```
-
----
-
-### API Mode (FastAPI)
+### API Mode
 
 ```bash
 uvicorn api.main:app --reload --port 8000
 ```
 
-Open:
+API root: http://localhost:8000. Interactive docs: http://localhost:8000/docs.
 
-* [http://localhost:8000](http://localhost:8000)
-* [http://localhost:8000/docs](http://localhost:8000/docs)
-
----
-
-## API Usage (FastAPI)
-
-The API exposes endpoints for dataset upload, run execution, result retrieval, and chart serving.
-
-Runs execute asynchronously in the background. Status and logs can be polled during execution.
-
-### Core Endpoints
-
-* `GET /health`
-  API health status and OpenAI configuration check.
-
-* `POST /datasets`
-  Upload a CSV dataset. The file is cleaned using the existing pipeline logic.
-
-* `GET /datasets`
-  List uploaded datasets.
-
-* `GET /datasets/{dataset_id}?n_rows=10`
-  Retrieve dataset metadata with a preview of cleaned rows.
-
-* `DELETE /datasets/{dataset_id}`
-  Delete a dataset and its stored file.
-
-* `POST /runs`
-  Create and start an analysis run for a dataset.
-
-* `GET /runs/{run_id}`
-  Poll run status and progress.
-
-* `GET /runs/{run_id}/logs`
-  Retrieve execution logs.
-
-* `GET /runs/{run_id}/results`
-  Retrieve filtered and paginated results.
-
-* `GET /runs/{run_id}/top-urgent`
-  Retrieve top urgent reviews by priority score.
-
-* `GET /runs/{run_id}/exports/results.csv`
-  Download full results as CSV.
-
-* `GET /runs/{run_id}/exports/top_urgent.csv`
-  Download top urgent results as CSV.
-
-* `GET /runs/{run_id}/charts`
-  List generated charts.
-
-* `GET /runs/{run_id}/charts/{chart_name}`
-  Serve chart images (PNG).
-
----
-
-### Example API Request
-
-Create a run for an uploaded dataset:
+### Dashboard
 
 ```bash
-curl -X POST http://localhost:8000/runs \
-  -H "Content-Type: application/json" \
-  -d '{
-    "dataset_id": "<dataset_id>",
-    "max_reviews": 50
-  }'
+streamlit run dashboard.py
 ```
+
+Set API_BASE_URL if the API URL differs from http://localhost:8000.
 
 ---
 
-### API Storage Notes
+## API Reference
 
-The FastAPI layer writes files under:
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| /health | GET | Health check, version, OpenAI configuration status |
+| /meta/schema | GET | JSON schema of analysis output model (ReviewAnalysis) |
+| /datasets | POST | Upload CSV; form fields: file, app_name, app_version, platform |
+| /datasets | GET | List datasets |
+| /datasets/{id} | GET | Dataset detail and preview (n_rows query param) |
+| /datasets/{id} | DELETE | Delete dataset and file |
+| /runs | POST | Create and start analysis run (background) |
+| /runs | GET | List runs |
+| /runs/{id} | GET | Run status, progress, error_message |
+| /runs/{id}/logs | GET | Execution logs |
+| /runs/{id}/summary | GET | Executive summary (KPIs, alerts, trends) |
+| /runs/{id}/results | GET | Filtered, paginated results (category, urgency, min_priority, limit, offset, sort) |
+| /runs/{id}/top-urgent | GET | Top N urgent reviews (limit query param) |
+| /runs/{id}/exports/results.csv | GET | Full results CSV download |
+| /runs/{id}/exports/top_urgent.csv | GET | Top urgent CSV download |
+| /runs/{id}/charts | GET | List charts |
+| /runs/{id}/charts/{name} | GET | Chart image (PNG) |
 
-```
-storage/datasets/
-storage/runs/{run_id}/
-```
+---
 
-This directory is ignored by git.
+## Input Schema
 
-Note:
-The API layer is intentionally implemented as an MVP. Dataset and run metadata are stored in-memory to prioritize pipeline integration and API ergonomics over persistence. This can be replaced with a database-backed store in a later phase.
+Required columns: review_id, review_text, rating (1-5), thumbs_up.
+
+Optional: source (google_play/app_store), review_timestamp, review_date, app_version, device, os_version, language, country, developer_response, response_timestamp.
 
 ---
 
@@ -180,278 +309,33 @@ The API layer is intentionally implemented as an MVP. Dataset and run metadata a
 
 ```
 ai-review-analysis-pipeline/
-├─ api/
-│  ├─ routers/
-│  │  ├─ __init__.py
-│  │  ├─ health.py           # Health check endpoints
-│  │  ├─ meta.py             # Output schema metadata endpoints
-│  │  ├─ datasets.py         # Dataset upload and management endpoints
-│  │  ├─ runs.py             # Run lifecycle endpoints
-│  │  └─ results.py          # Results, exports, and charts endpoints
-│  ├─ schemas/
-│  │  ├─ __init__.py
-│  │  ├─ common.py           # Shared response models
-│  │  ├─ datasets.py         # Dataset request/response schemas
-│  │  ├─ runs.py             # Run request/response schemas
-│  │  └─ results.py          # Results and charts schemas
-│  ├─ services/
-│  │  ├─ __init__.py
-│  │  ├─ dataset_service.py  # Dataset management and cleaning logic
-│  │  ├─ pipeline_service.py # Orchestrates app/* pipeline modules
-│  │  ├─ run_service.py      # Run lifecycle and result retrieval logic
-│  │  └─ storage_service.py  # File system operations
-│  ├─ storage/
-│  │  ├─ __init__.py
-│  │  ├─ in_memory.py        # In-memory metadata store (MVP)
-│  │  └─ models.py           # Dataset and Run dataclasses
-│  ├─ __init__.py
-│  ├─ config.py              # API configuration (.env via pydantic-settings)
-│  ├─ deps.py                # FastAPI dependency injection
-│  └─ main.py                # FastAPI app entry point
-├─ app/
-│  ├─ load_reviews.py        # Load and clean CSV input
-│  ├─ analyze_reviews.py     # Build LLM payloads
-│  ├─ schema.py              # Output schema (Pydantic)
-│  ├─ prompts.py             # Prompt definitions
-│  ├─ llm_client.py          # LLM client and parsing logic
-│  ├─ run_batch.py           # Batch execution
-│  ├─ priority.py            # Phase 2: priority scoring
-│  └─ visualize.py           # Phase 2: charts and exports
-├─ data/
-│  ├─ input/
-│  │  └─ reviews.csv
-│  └─ output/
-│     ├─ results.csv
-│     ├─ top_urgent.csv
-│     └─ charts/
-│        ├─ category_distribution.png
-│        ├─ urgency_distribution.png
-│        ├─ priority_weighted_category.png
-│        ├─ urgency_category_heatmap.png
-│        └─ top_urgent_table.png
-├─ storage/                  # API-generated datasets and run outputs (gitignored)
-├─ main.py
-├─ requirements.txt
-├─ .env.example
-└─ README.md
+├── api/
+│   ├── routers/         # health, meta, datasets, runs, results, summary
+│   ├── schemas/         # Request/response models
+│   ├── services/        # dataset, pipeline, run, storage, summary
+│   ├── storage/         # In-memory store, models
+│   ├── config.py
+│   ├── deps.py
+│   └── main.py
+├── app/
+│   ├── load_reviews.py
+│   ├── analyze_reviews.py
+│   ├── prompts.py
+│   ├── llm_client.py
+│   ├── run_batch.py
+│   ├── priority.py
+│   ├── schema.py
+│   └── visualize.py
+├── dashboard.py
+├── main.py
+├── scraper.py
+├── data/
+│   ├── input/
+│   └── output/
+└── storage/
+    ├── datasets/
+    └── runs/
 ```
-
----
-
-## Input Data
-
-File: [data/input/reviews.csv](data/input/reviews.csv)
-
-Raw user reviews.
-The test dataset may include duplicate rows or missing values to validate pipeline robustness.
-
-Required columns:
-
-* `review_id`
-* `review_text`
-* `rating` (1–5)
-* `thumbs_up`
-* `source` (`google_play` / `app_store`)
-
-Example:
-
-| review_id | review_text               | rating | thumbs_up |
-| --------- | ------------------------- | ------ | --------- |
-| rev_001   | App crashes after payment | 1      | 0         |
-| rev_002   | Great game, love it       | 5      | 12        |
-
----
-
-## Output Data
-
-### Main Results
-
-File: [data/output/results.csv](data/output/results.csv)
-
-Structured output produced by the LLM and enriched in Phase 2.
-
-Columns:
-
-* `review_id`
-* `category`
-* `urgency`
-* `rating`
-* `thumbs_up`
-* `summary`
-* `priority_score`
-
-Sample:
-
-| review_id | category    | urgency | rating | thumbs_up | priority_score | summary                   |
-| --------- | ----------- | ------- | ------ | --------- | -------------- | ------------------------- |
-| rev_001   | payment     | high    | 1      | 0         | 140            | App crashes after payment |
-| rev_004   | performance | high    | 2      | 15        | 145            | Performance very slow     |
-
----
-
-### Top Urgent Reviews
-
-File: [data/output/top_urgent.csv](data/output/top_urgent.csv)
-
-Top 10 reviews sorted by `priority_score` in descending order.
-
-Purpose: quick triage and escalation.
-
-Columns:
-
-* `review_id`
-* `category`
-* `urgency`
-* `rating`
-* `thumbs_up`
-* `priority_score`
-* `summary`
-
----
-
-## Priority Scoring
-
-Priority score is computed to support backlog ordering.
-
-Formula:
-
-```
-priority_score =
-  urgency_weight
-+ rating_penalty
-+ thumbs_bonus
-```
-
-Where:
-
-* urgency_weight: high = 100, medium = 50, low = 10
-* rating_penalty: (5 - rating) * 10
-* thumbs_bonus: min(thumbs_up, 50)
-
-### Robustness Notes
-
-To ensure the pipeline does not break on imperfect datasets, **defensive defaults** are applied:
-
-* If `rating` is missing or non-numeric → default **3**
-* If `thumbs_up` is missing or invalid → default **0**
-
----
-
-## Visual Outputs
-
-Charts are generated automatically under `data/output/charts/`.
-
-### Category Distribution
-
-Shows how reviews are distributed across issue categories.
-
-![Category Distribution](data/output/charts/category_distribution.png)
-
----
-
-### Urgency Distribution
-
-Shows urgency levels across all analyzed reviews.
-
-![Urgency Distribution](data/output/charts/urgency_distribution.png)
-
----
-
-### Priority-Weighted Category Impact
-
-Highlights categories with the highest cumulative impact based on priority scoring.
-
-![Priority Weighted Category](data/output/charts/priority_weighted_category.png)
-
----
-
-### Urgency × Category Heatmap
-
-Helps identify where high-urgency issues are concentrated.
-
-![Urgency Category Heatmap](data/output/charts/urgency_category_heatmap.png)
-
----
-
-### Top 10 Urgent Issues (Shareable Table)
-
-Slack-ready visual table for quick escalation.
-
-![Top Urgent Table](data/output/charts/top_urgent_table.png)
-
----
-
-## Dependencies
-
-### Core
-
-* `pandas`
-* `openai`
-* `pydantic`
-
-### Visualization
-
-* `matplotlib`
-* `seaborn`
-
-### API
-
-* `fastapi`
-* `uvicorn[standard]`
-* `python-multipart`
-* `pydantic-settings`
-
----
-
-## Design Notes
-
-* LLM output is constrained to a fixed JSON schema.
-* All outputs are validated before being written.
-* The pipeline continues gracefully if a single review fails.
-* Existing `app/` modules are reused without modification.
-* API runs are isolated per execution.
-* Designed for reproducibility and auditability.
-
----
-
-## Example Pipeline Run (CLI Output)
-
-Below is a sample terminal output from a successful end-to-end run:
-
-```text
-[1/3] Loading reviews...
-Reviews cleaned: 50 → 42
-42 reviews loaded
-
-[2/3] Building payloads...
-42 payloads ready
-
-[3/3] Running AI analysis...
-Analyzing: 100%|████████████████████████| 42/42 [01:24<00:00,  2.00s/it]
-
-[Phase 2] Adding priority scores...
-Results saved: data/output/results.csv
-Top 10 urgent saved: data/output/top_urgent.csv
-Charts saved: data/output/charts/
-
-Summary:
-Categories: {'bug': 15, 'performance': 6, 'feature_request': 5, 'ads': 5, 'complaint': 5, 'payment': 3, 'praise': 2, 'other': 1}
-Urgency: {'medium': 17, 'high': 13, 'low': 12}
-```
-
-This output demonstrates that the pipeline runs end-to-end and produces all expected artifacts.
-
----
-
-## Roadmap
-
-### Phase 4
-
-* Slack and email reporting
-* Scheduled execution (cron / queue-based)
-* Persistent storage for metadata
-* Authentication and multi-user support
-* External system integration
 
 ---
 
@@ -461,5 +345,5 @@ This output demonstrates that the pipeline runs end-to-end and produces all expe
 
 Information Systems and Technologies / AI and Data Engineering Focus
 
-GitHub: [https://github.com/mertcaralan](https://github.com/mertcaralan)
-LinkedIn: [https://www.linkedin.com/in/mertcaralan/](https://www.linkedin.com/in/mertcaralan/)
+GitHub: https://github.com/mertcaralan  
+LinkedIn: https://www.linkedin.com/in/mertcaralan/
