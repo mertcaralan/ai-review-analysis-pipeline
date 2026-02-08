@@ -10,28 +10,11 @@ from api.schemas.results import (
     ChartInfo,
 )
 from api.services.run_service import RunService
-from api.services.dataset_service import DatasetService
-from api.storage.in_memory import InMemoryStore
 from api.config import Settings
-from api.deps import get_config, get_storage
+from api.deps import get_config, get_run_service
+from api.storage.models import RunStatus
 
 router = APIRouter(prefix="/runs", tags=["Results"])
-
-
-def get_dataset_service(
-    store: InMemoryStore = Depends(get_storage), config: Settings = Depends(get_config)
-) -> DatasetService:
-    """Dependency injection for DatasetService."""
-    return DatasetService(store, config.DATASETS_DIR)
-
-
-def get_run_service(
-    store: InMemoryStore = Depends(get_storage),
-    config: Settings = Depends(get_config),
-    dataset_service: DatasetService = Depends(get_dataset_service),
-) -> RunService:
-    """Dependency injection for RunService."""
-    return RunService(store, config.RUNS_DIR, dataset_service)
 
 
 def _parse_tags(tags_value) -> list[str]:
@@ -86,9 +69,9 @@ def get_results(
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    if run.status != "completed":
+    if run.status != RunStatus.COMPLETED:
         raise HTTPException(
-            400, f"Run {run_id} is not completed yet (status: {run.status})"
+            400, f"Run {run_id} is not completed yet (status: {run.status.value})"
         )
 
     results, total = service.get_results(
@@ -128,9 +111,9 @@ def get_top_urgent(
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    if run.status != "completed":
+    if run.status != RunStatus.COMPLETED:
         raise HTTPException(
-            400, f"Run {run_id} is not completed yet (status: {run.status})"
+            400, f"Run {run_id} is not completed yet (status: {run.status.value})"
         )
 
     results = service.get_top_urgent(run_id, limit)
@@ -208,9 +191,9 @@ def list_charts(run_id: str, service: RunService = Depends(get_run_service)):
     if not run:
         raise HTTPException(404, f"Run {run_id} not found")
 
-    if run.status != "completed":
+    if run.status != RunStatus.COMPLETED:
         raise HTTPException(
-            400, f"Run {run_id} is not completed yet (status: {run.status})"
+            400, f"Run {run_id} is not completed yet (status: {run.status.value})"
         )
 
     charts = service.list_charts(run_id)

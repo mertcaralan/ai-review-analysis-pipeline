@@ -1,7 +1,9 @@
 from pathlib import Path
+import json
 import pandas as pd
 import sys
 from io import StringIO
+from typing import Optional
 
 from app.analyze_reviews import build_review_payloads
 from app.run_batch import run_llm_batch
@@ -13,25 +15,33 @@ class PipelineService:
     """
     Orchestrates existing app/* pipeline with run-scoped outputs.
 
-    Wraps existing CLI modules without modification.
+    Wraps existing CLI modules; receives dataset metadata from API so pipeline
+    and CSV outputs stay aligned with upload context (app_name, version, platform).
     """
 
     @staticmethod
     def run_analysis(
-        input_csv: Path, output_dir: Path, max_reviews: int = None, log_callback=None
+        input_csv: Path,
+        output_dir: Path,
+        max_reviews: Optional[int] = None,
+        log_callback=None,
+        dataset_metadata: Optional[dict] = None,
     ) -> dict:
         """
         Execute full analysis pipeline.
 
         Args:
             input_csv: Path to cleaned reviews CSV
-            output_dir: Run-specific output directory
+            output_dir: Run-specific output directory (storage/runs/<run_id>)
             max_reviews: Optional limit on number of reviews
             log_callback: Function to call with log messages
+            dataset_metadata: Optional dict with app_name, app_version, platform
+                so LLM and outputs are context-aware.
 
         Returns:
             dict with summary info (total_reviews, file paths)
         """
+        dataset_metadata = dataset_metadata or {}
         output_dir.mkdir(parents=True, exist_ok=True)
         charts_dir = output_dir / "charts"
 
@@ -39,6 +49,19 @@ class PipelineService:
             """Helper to log messages."""
             if log_callback:
                 log_callback(msg)
+
+        # Persist metadata next to results for traceability (run ↔ dataset context)
+        meta_path = output_dir / "run_metadata.json"
+        with open(meta_path, "w") as f:
+            json.dump(
+                {
+                    "app_name": dataset_metadata.get("app_name"),
+                    "app_version": dataset_metadata.get("app_version"),
+                    "platform": dataset_metadata.get("platform"),
+                },
+                f,
+                indent=2,
+            )
 
         # Load reviews
         log(f"Loading reviews from {input_csv}")
@@ -52,17 +75,18 @@ class PipelineService:
         total_reviews = len(df)
         log(f"Processing {total_reviews} reviews")
 
-        # Build payloads (reuse existing module)
+        # Build payloads (reuse existing module; passes through review_date when present)
         log("Building LLM payloads...")
         payload_df = build_review_payloads(df)
 
-        # Run LLM analysis (reuse existing module)
+        # Run LLM analysis with app context so advice can be product-specific
         log("Starting LLM analysis...")
+        app_name = dataset_metadata.get("app_name")
 
         # Suppress tqdm output from run_batch
         old_stdout = sys.stdout
         sys.stdout = StringIO()
-        results_df = run_llm_batch(payload_df)
+        results_df = run_llm_batch(payload_df, app_name=app_name)
         sys.stdout = old_stdout
 
         log(f"LLM analysis complete for {len(results_df)} reviews")

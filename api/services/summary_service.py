@@ -21,6 +21,7 @@ from api.schemas.summary import (
     DatasetMetadataSummary,
 )
 from api.storage.in_memory import InMemoryStore
+from api.storage.models import RunStatus
 
 logger = logging.getLogger(__name__)
 
@@ -163,7 +164,7 @@ class SummaryService:
         if not run:
             raise ValueError(f"Run {run_id} not found")
 
-        if run.status != "completed":
+        if run.status != RunStatus.COMPLETED:
             raise ValueError(
                 f"Run {run_id} is not completed (status: {run.status})"
             )
@@ -567,7 +568,7 @@ class SummaryService:
             r
             for r in all_runs
             if r.dataset_id == dataset_id
-            and r.status == "completed"
+            and r.status == RunStatus.COMPLETED
             and r.run_id != current_run_id
             and getattr(r, "completed_at", None) is not None
             and r.completed_at < current_run.completed_at

@@ -3,7 +3,13 @@ from api.storage.models import Dataset, Run
 
 
 class InMemoryStore:
-    """Simple in-memory storage for datasets and runs (MVP)."""
+    """
+    Simple in-memory storage for datasets and runs (MVP).
+
+    State is lost on process restart. Files under storage/datasets and
+    storage/runs persist; runs and datasets in the store do not. See README
+    "State and ghost data" for reconciliation and production options.
+    """
 
     def __init__(self):
         self.datasets: dict[str, Dataset] = {}

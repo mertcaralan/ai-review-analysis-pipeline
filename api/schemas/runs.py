@@ -10,7 +10,6 @@ class RunCreateRequest(BaseModel):
     max_reviews: Optional[int] = Field(
         None, description="Limit number of reviews to process"
     )
-    batch_size: int = Field(10, description="Reviews per batch")
     model: str = Field("gpt-4o-mini", description="OpenAI model to use")
 
 

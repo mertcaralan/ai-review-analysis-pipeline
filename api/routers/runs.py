@@ -1,37 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+
 from api.schemas.runs import RunCreateRequest, RunResponse, RunLogsResponse
 from api.services.run_service import RunService
-from api.services.dataset_service import DatasetService
-from api.storage.in_memory import InMemoryStore
-from api.config import Settings
-from api.deps import get_config, get_storage
+from api.deps import get_run_service
 
 router = APIRouter(prefix="/runs", tags=["Runs"])
-
-# ============================================================================
-# DEPENDENCIES
-# ============================================================================
-
-
-def get_dataset_service(
-    store: InMemoryStore = Depends(get_storage), config: Settings = Depends(get_config)
-) -> DatasetService:
-    """Dependency injection for DatasetService."""
-    return DatasetService(store, config.DATASETS_DIR)
-
-
-def get_run_service(
-    store: InMemoryStore = Depends(get_storage),
-    config: Settings = Depends(get_config),
-    dataset_service: DatasetService = Depends(get_dataset_service),
-) -> RunService:
-    """Dependency injection for RunService."""
-    return RunService(store, config.RUNS_DIR, dataset_service)
-
-
-# ============================================================================
-# ENDPOINTS
-# ============================================================================
 
 
 @router.get("", response_model=list[RunResponse])

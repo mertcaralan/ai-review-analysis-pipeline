@@ -71,11 +71,16 @@ class RunService:
             run.logs.append(f"[{datetime.now()}] Run started")
             self.store.save_run(run)
 
-            # Get dataset
+            # Get dataset (and metadata for pipeline/LLM context)
             dataset = self.dataset_service.get_dataset(run.dataset_id)
             input_csv = Path(dataset.file_path)
+            dataset_metadata = {
+                "app_name": getattr(dataset, "app_name", None),
+                "app_version": getattr(dataset, "app_version", None),
+                "platform": getattr(dataset, "platform", None),
+            }
 
-            # Prepare run-specific output directory
+            # Prepare run-specific output directory (run_id = folder name; no hardcoded paths)
             output_dir = self.runs_dir / run_id
 
             def log_callback(msg: str):
@@ -83,12 +88,13 @@ class RunService:
                 run.logs.append(f"[{datetime.now()}] {msg}")
                 self.store.save_run(run)
 
-            # Execute pipeline
+            # Execute pipeline with metadata so CSV/LLM stay aligned with upload context
             summary = self.pipeline_service.run_analysis(
                 input_csv=input_csv,
                 output_dir=output_dir,
                 max_reviews=run.config.get("max_reviews"),
                 log_callback=log_callback,
+                dataset_metadata=dataset_metadata,
             )
 
             # Update run to completed

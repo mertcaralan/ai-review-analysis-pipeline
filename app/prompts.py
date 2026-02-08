@@ -4,6 +4,9 @@ You are an expert product analyst for mobile apps.
 Analyze the following app review and return ONLY a valid JSON object.
 Do NOT include markdown, explanations, or extra text.
 
+Product context (use for specific, actionable advice):
+- App/Product: {app_name}
+
 Review context:
 - Review ID: {review_id}
 - Review Text: "{review_text}"

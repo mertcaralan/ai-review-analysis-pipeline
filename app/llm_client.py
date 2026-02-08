@@ -1,7 +1,9 @@
 import json
+from typing import Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
+from pydantic import ValidationError
 
 from app.prompts import ANALYZE_REVIEW_PROMPT
 from app.schema import ReviewAnalysis
@@ -10,8 +12,13 @@ load_dotenv()
 client = OpenAI()
 
 
-def analyze_single_review(payload: dict) -> ReviewAnalysis:
-    prompt = ANALYZE_REVIEW_PROMPT.format(**payload)
+def analyze_single_review(
+    payload: dict, app_name: Optional[str] = None
+) -> ReviewAnalysis:
+    """Analyze one review; app_name gives the LLM product context for specific advice."""
+    # Prompt expects app_name (default so format never fails)
+    prompt_payload = {**payload, "app_name": app_name or "this app"}
+    prompt = ANALYZE_REVIEW_PROMPT.format(**prompt_payload)
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -39,8 +46,8 @@ def analyze_single_review(payload: dict) -> ReviewAnalysis:
     try:
         data = json.loads(content)
         return ReviewAnalysis(**data)
-    except:
-        # Fallback if parsing fails
+    except (json.JSONDecodeError, ValidationError):
+        # Fallback if parsing or validation fails
         return ReviewAnalysis(
             review_id=payload["review_id"],
             category="other",
